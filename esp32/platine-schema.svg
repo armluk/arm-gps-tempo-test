@@ -1,0 +1,218 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 680" width="1120" height="680" font-family="Arial, Helvetica, sans-serif" font-size="13">
+  <rect width="1120" height="680" fill="#FFFFFF"/>
+  <style>
+    .w{stroke:#2E3236;stroke-width:2;fill:none}
+    .opt{stroke:#9AA3A8;stroke-width:2;fill:none;stroke-dasharray:6 4}
+    .box{stroke:#2E3236;stroke-width:2;fill:#FFFFFF}
+    .lbl{fill:#2E3236}
+    .sm{font-size:11px;fill:#5B6267}
+    .h{font-size:15px;font-weight:bold;fill:#2E3236}
+    .dot{fill:#2E3236}
+  </style>
+
+  <text x="20" y="28" class="h">Durchfluss-Sender Güllefass – Platinenschema V3 (zur Kontrolle)</text>
+  <text x="20" y="46" class="sm">Arm Eggiwil AG · 13.10.2026 · Entwurf, nicht geprüft</text>
+
+  <!-- ================= Sensor-Seite ================= -->
+  <text x="40" y="68" class="h">Sensor (bestehend)</text>
+
+  <!-- Schienen -->
+  <line class="w" x1="40" y1="100" x2="600" y2="100"/>
+  <text x="40" y="92" class="lbl">+ 8 … 30 V DC</text>
+  <line class="w" x1="40" y1="580" x2="600" y2="580"/>
+  <text x="40" y="598" class="lbl">GND / –</text>
+
+  <!-- KROHNE -->
+  <rect class="box" x="120" y="240" width="160" height="140" rx="18"/>
+  <text x="200" y="300" text-anchor="middle" class="h">KROHNE</text>
+  <text x="200" y="318" text-anchor="middle" class="lbl">OPTIFLUX 1000</text>
+  <text x="200" y="334" text-anchor="middle" class="lbl">DN 80</text>
+  <text x="150" y="258" text-anchor="middle" class="sm">L</text>
+  <text x="250" y="258" text-anchor="middle" class="sm">N</text>
+  <text x="150" y="372" text-anchor="middle" class="sm">D–</text>
+  <text x="250" y="372" text-anchor="middle" class="sm">D</text>
+
+  <!-- L an + -->
+  <line class="w" x1="150" y1="100" x2="150" y2="240"/>
+  <circle class="dot" cx="150" cy="100" r="4"/>
+  <!-- D- an + -->
+  <polyline class="w" points="150,380 150,420 90,420 90,100"/>
+  <circle class="dot" cx="90" cy="100" r="4"/>
+  <text x="96" y="440" class="sm">D– an +</text>
+  <!-- N an GND -->
+  <polyline class="w" points="250,240 250,210 340,210 340,580"/>
+  <circle class="dot" cx="340" cy="580" r="4"/>
+  <text x="346" y="226" class="sm">N an GND</text>
+  <!-- D = Signal -->
+  <polyline class="w" points="250,380 250,480 600,480"/>
+  <text x="256" y="474" class="sm">D = Impuls</text>
+  <!-- Pulldown 1k am Sensor -->
+  <circle class="dot" cx="300" cy="480" r="4"/>
+  <line class="w" x1="300" y1="480" x2="300" y2="505"/>
+  <rect class="box" x="292" y="505" width="16" height="45"/>
+  <line class="w" x1="300" y1="550" x2="300" y2="580"/>
+  <circle class="dot" cx="300" cy="580" r="4"/>
+  <text x="200" y="525" class="lbl">1 kΩ</text>
+  <text x="168" y="541" class="sm">Pulldown am Sensor</text>
+  <!-- Kreuzung N-Leitung / Signal: nicht verbunden -->
+  <!-- bestehendes Gerät -->
+  <circle class="dot" cx="420" cy="480" r="4"/>
+  <line class="w" x1="420" y1="480" x2="420" y2="500"/>
+  <rect class="box" x="380" y="500" width="130" height="44"/>
+  <text x="445" y="518" text-anchor="middle" class="lbl">bestehendes</text>
+  <text x="445" y="534" text-anchor="middle" class="lbl">Gerät</text>
+  <line class="w" x1="490" y1="544" x2="490" y2="580"/>
+  <circle class="dot" cx="490" cy="580" r="4"/>
+
+  <text x="530" y="92" class="sm">Litze VIN</text>
+  <text x="530" y="472" class="sm">Litze SIG</text>
+  <text x="530" y="572" class="sm">Litze GND</text>
+
+  <!-- ================= Platine ================= -->
+  <rect x="600" y="58" width="410" height="560" fill="#ECEFF1" fill-opacity="0.45" stroke="#2E3236" stroke-width="1.5" stroke-dasharray="8 5"/>
+  <text x="760" y="610" class="h">Trägerplatine (vergossen)</text>
+
+  <!-- Lötpads links -->
+  <rect x="594" y="94" width="12" height="12" fill="#FFF005" stroke="#2E3236"/>
+  <text x="612" y="122" class="sm">P1 VIN</text>
+  <rect x="594" y="474" width="12" height="12" fill="#FFF005" stroke="#2E3236"/>
+  <text x="612" y="502" class="sm">P3 SIG</text>
+  <rect x="594" y="574" width="12" height="12" fill="#FFF005" stroke="#2E3236"/>
+  <text x="612" y="602" class="sm">P2 GND</text>
+
+  <!-- Versorgung: F1 -> D1 -> VIN -->
+  <line class="w" x1="606" y1="100" x2="640" y2="100"/>
+  <rect class="box" x="640" y="92" width="44" height="16"/>
+  <text x="662" y="86" text-anchor="middle" class="lbl">F1</text>
+  <text x="662" y="128" text-anchor="middle" class="sm">PTC 0.5 A</text>
+  <line class="w" x1="684" y1="100" x2="712" y2="100"/>
+  <polygon points="712,90 712,110 732,100" fill="#2E3236"/>
+  <line class="w" x1="733" y1="89" x2="733" y2="111"/>
+  <text x="722" y="86" text-anchor="middle" class="lbl">D1</text>
+  <text x="722" y="128" text-anchor="middle" class="sm">1N5819</text>
+  <line class="w" x1="733" y1="100" x2="880" y2="100"/>
+
+  <!-- D2 TVS -->
+  <circle class="dot" cx="770" cy="100" r="4"/>
+  <line class="w" x1="770" y1="100" x2="770" y2="140"/>
+  <polygon points="760,160 780,160 770,140" fill="#2E3236"/>
+  <line class="w" x1="759" y1="140" x2="781" y2="140"/>
+  <line class="w" x1="770" y1="160" x2="770" y2="220"/>
+  <text x="742" y="176" class="lbl">D2</text>
+  <text x="712" y="192" class="sm">P6KE36A</text>
+  <!-- C1 -->
+  <circle class="dot" cx="820" cy="100" r="4"/>
+  <line class="w" x1="820" y1="100" x2="820" y2="146"/>
+  <line class="w" x1="806" y1="146" x2="834" y2="146"/>
+  <line class="w" x1="806" y1="154" x2="834" y2="154"/>
+  <line class="w" x1="820" y1="154" x2="820" y2="220"/>
+  <text x="828" y="140" class="lbl">C1</text>
+  <text x="828" y="174" class="sm">10 µ / 50 V</text>
+  <!-- U2 -->
+  <rect class="box" x="880" y="82" width="80" height="56"/>
+  <text x="920" y="106" text-anchor="middle" class="lbl">U2</text>
+  <text x="920" y="122" text-anchor="middle" class="sm">TSR 1-2450</text>
+  <text x="886" y="96" class="sm">IN</text>
+  <text x="944" y="96" class="sm">5V</text>
+  <line class="w" x1="920" y1="138" x2="920" y2="220"/>
+  <text x="926" y="152" class="sm">GND</text>
+  <line class="w" x1="960" y1="100" x2="1004" y2="100"/>
+  <!-- C2 -->
+  <circle class="dot" cx="982" cy="100" r="4"/>
+  <line class="w" x1="982" y1="100" x2="982" y2="166"/>
+  <line class="w" x1="968" y1="166" x2="996" y2="166"/>
+  <line class="w" x1="968" y1="174" x2="996" y2="174"/>
+  <line class="w" x1="982" y1="174" x2="982" y2="220"/>
+  <text x="940" y="164" class="lbl">C2</text>
+  <text x="940" y="180" class="sm">22 µ</text>
+  <text x="940" y="194" class="sm">10 V</text>
+  <!-- lokale GND-Leitung -->
+  <line class="w" x1="770" y1="220" x2="982" y2="220"/>
+  <circle class="dot" cx="820" cy="220" r="4"/>
+  <circle class="dot" cx="920" cy="220" r="4"/>
+  <circle class="dot" cx="982" cy="220" r="4"/>
+  <polyline class="w" points="982,220 990,220 990,580"/>
+
+  <!-- Signal: P3 -> R1 -> Optokoppler -->
+  <line class="w" x1="606" y1="480" x2="690" y2="480"/>
+  <!-- R2 optional -->
+  <circle cx="640" cy="480" r="4" fill="#9AA3A8"/>
+  <line class="opt" x1="640" y1="480" x2="640" y2="510"/>
+  <rect x="632" y="510" width="16" height="40" fill="#FFFFFF" stroke="#9AA3A8" stroke-width="2" stroke-dasharray="6 4"/>
+  <line class="opt" x1="640" y1="550" x2="640" y2="580"/>
+  <text x="652" y="526" class="sm">R2 1 kΩ – entfällt</text>
+  <text x="652" y="540" class="sm">(Pulldown sitzt am Sensor)</text>
+  <!-- R1 senkrecht -->
+  <line class="w" x1="690" y1="480" x2="690" y2="440"/>
+  <rect class="box" x="682" y="390" width="16" height="50"/>
+  <line class="w" x1="690" y1="390" x2="690" y2="320"/>
+  <text x="652" y="410" class="lbl">R1</text>
+  <text x="620" y="426" class="sm">3.3 kΩ</text>
+  <line class="w" x1="690" y1="320" x2="800" y2="320"/>
+  <!-- D3 antiparallel -->
+  <circle class="dot" cx="735" cy="320" r="4"/>
+  <line class="w" x1="735" y1="320" x2="735" y2="345"/>
+  <line class="w" x1="724" y1="345" x2="746" y2="345"/>
+  <polygon points="724,365 746,365 735,345" fill="#2E3236"/>
+  <line class="w" x1="735" y1="365" x2="735" y2="400"/>
+  <text x="702" y="362" class="lbl">D3</text>
+  <text x="742" y="384" class="sm">1N4148</text>
+  <circle class="dot" cx="735" cy="400" r="4"/>
+  <line class="w" x1="735" y1="400" x2="800" y2="400"/>
+  <line class="w" x1="735" y1="400" x2="735" y2="580"/>
+  <circle class="dot" cx="735" cy="580" r="4"/>
+
+  <!-- U1 PC817 -->
+  <rect class="box" x="800" y="290" width="120" height="140"/>
+  <text x="860" y="448" text-anchor="middle" class="lbl">U1 PC817</text>
+  <text x="806" y="314" class="sm">1</text>
+  <text x="806" y="414" class="sm">2</text>
+  <text x="906" y="314" class="sm">4</text>
+  <text x="906" y="414" class="sm">3</text>
+  <!-- LED -->
+  <polyline class="w" points="800,320 830,320 830,345"/>
+  <polygon points="819,345 841,345 830,365" fill="#2E3236"/>
+  <line class="w" x1="819" y1="366" x2="841" y2="366"/>
+  <polyline class="w" points="830,366 830,400 800,400"/>
+  <line x1="846" y1="352" x2="858" y2="346" stroke="#2E3236" stroke-width="1.5"/>
+  <line x1="846" y1="362" x2="858" y2="356" stroke="#2E3236" stroke-width="1.5"/>
+  <!-- Transistor -->
+  <line class="w" x1="872" y1="338" x2="872" y2="382"/>
+  <polyline class="w" points="872,350 892,334 892,320 920,320"/>
+  <polyline class="w" points="872,370 892,386 892,400 920,400"/>
+  <polygon points="886,378 893,387 883,387" fill="#2E3236"/>
+
+  <!-- Ausgang -->
+  <line class="w" x1="920" y1="320" x2="1004" y2="320"/>
+  <line class="w" x1="920" y1="400" x2="990" y2="400"/>
+  <circle class="dot" cx="990" cy="400" r="4"/>
+  <!-- GND-Schiene Platine -->
+  <line class="w" x1="606" y1="580" x2="1004" y2="580"/>
+  <circle class="dot" cx="990" cy="580" r="4"/>
+
+  <!-- Lötpads rechts -->
+  <rect x="1004" y="94" width="12" height="12" fill="#FFF005" stroke="#2E3236"/>
+  <rect x="1004" y="314" width="12" height="12" fill="#FFF005" stroke="#2E3236"/>
+  <rect x="1004" y="574" width="12" height="12" fill="#FFF005" stroke="#2E3236"/>
+  <text x="1016" y="122" class="sm">P4</text>
+  <text x="1016" y="342" class="sm">P6</text>
+  <text x="1016" y="602" class="sm">P5</text>
+
+  <!-- Grove zum ATOM -->
+  <line x1="1016" y1="100" x2="1046" y2="100" stroke="#C62828" stroke-width="3"/>
+  <line x1="1016" y1="320" x2="1046" y2="320" stroke="#C9A800" stroke-width="3"/>
+  <line x1="1016" y1="580" x2="1046" y2="580" stroke="#000000" stroke-width="3"/>
+  <text x="1018" y="92" class="sm">rot</text>
+  <text x="1018" y="312" class="sm">gelb</text>
+  <text x="1018" y="572" class="sm">schwarz</text>
+  <rect x="1046" y="70" width="60" height="540" fill="#2E3236"/>
+  <text x="1080" y="210" fill="#FFFFFF" font-weight="bold" text-anchor="middle" transform="rotate(-90 1080 210)">M5Stack ATOM Lite</text>
+  <text x="1080" y="450" fill="#FFFFFF" class="sm" text-anchor="middle" transform="rotate(-90 1080 450)" style="fill:#FFFFFF">Grove · G32 frei</text>
+  <text x="1060" y="104" fill="#FFFFFF" class="sm" style="fill:#FFFFFF">5V</text>
+  <text x="1054" y="324" style="fill:#FFFFFF" class="sm">G26</text>
+  <text x="1054" y="584" style="fill:#FFFFFF" class="sm">GND</text>
+
+  <!-- Legende -->
+  <text x="20" y="640" class="sm">Linien ohne Punkt, die sich kreuzen, sind nicht verbunden. Gestrichelt = Bauteil entfällt. Gelbe Quadrate = Lötpads für Litzen bzw. Grove-Adern.</text>
+  <text x="20" y="658" class="sm">Impuls «high» (D = +) → LED in U1 leuchtet → Transistor leitet → G26 = LOW. Interner Pull-up des ESP32 an G26, Software zählt fallende Flanken.</text>
+</svg>
