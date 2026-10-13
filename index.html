@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="de-CH">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#2E3236">
+<title>GPS-Tempo-Test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--yellow:#FFF005;--dark:#2E3236;--surface:#3A3F44;--fuge:#4A5157;--on-dark:#C9CFD3;--error:#B3261E}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--dark);color:#fff;font-family:Archivo,'Segoe UI',system-ui,-apple-system,Arial,sans-serif;-webkit-tap-highlight-color:transparent}
+body{min-height:100vh;display:flex;flex-direction:column}
+header{height:72px;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid var(--surface)}
+header img{width:44px;height:44px;background:#000;display:block}
+.brand b{display:block;font-size:14px;font-weight:900;letter-spacing:.02em}
+.brand span{font-size:11px;color:var(--on-dark)}
+main{flex:1;padding:20px 16px 24px;display:flex;flex-direction:column;gap:16px;max-width:520px;width:100%;margin:0 auto}
+.eyebrow{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--on-dark)}
+.eyebrow::before{content:"";width:28px;height:6px;background:var(--yellow)}
+.label{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--on-dark)}
+.panel{background:var(--surface);border-top:6px solid var(--yellow)}
+.tempo{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 16px 16px}
+.ist{font-size:88px;font-weight:900;line-height:1;letter-spacing:-.02em}
+.ist small{font-size:20px;font-weight:700;letter-spacing:0;margin-left:6px}
+.soll-line{font-size:14px;font-weight:600;color:var(--on-dark);margin-top:6px}
+.arrow{width:112px;flex:none;display:flex;flex-direction:column;align-items:center;gap:8px}
+.arrow .tile{width:112px;height:112px;background:var(--yellow);color:var(--dark);display:flex;align-items:center;justify-content:center}
+.arrow .txt{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--yellow)}
+.arrow[hidden]{display:flex;visibility:hidden}
+.foot{display:flex;justify-content:space-between;gap:8px;padding:10px 16px;border-top:1px solid var(--dark);font-size:12px;font-weight:600;color:var(--on-dark)}
+.warn{color:#fff;background:var(--error);padding:2px 6px}
+.soll{padding:16px;display:flex;flex-direction:column;gap:10px;border:1px solid var(--fuge)}
+.soll-row{display:flex;align-items:baseline;justify-content:space-between}
+.soll-val{font-size:30px;font-weight:900}
+.soll-val small{font-size:14px;font-weight:700;margin-left:4px}
+.ctrl{display:flex;align-items:center;gap:10px}
+.step{width:44px;height:44px;flex:none;border:0;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.step:active{background:var(--yellow);color:var(--dark)}
+input[type=range]{-webkit-appearance:none;appearance:none;flex:1;min-width:0;height:44px;margin:0;background:transparent}
+input[type=range]::-webkit-slider-runnable-track{height:8px;background:linear-gradient(to right,#fff var(--p,40%),var(--fuge) var(--p,40%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;margin-top:-10px;background:var(--yellow);border:2px solid var(--dark);border-radius:0}
+input[type=range]::-moz-range-track{height:8px;background:var(--fuge)}
+input[type=range]::-moz-range-progress{height:8px;background:#fff}
+input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yellow);border:2px solid var(--dark);border-radius:0}
+.btn{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:56px;padding:16px 22px;border:2px solid var(--yellow);background:var(--yellow);color:var(--dark);font:700 14px/1 Archivo,'Segoe UI',system-ui,sans-serif;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.btn.line{background:transparent;color:#fff;border-color:#fff}
+.btn:active{background:var(--dark);color:var(--yellow)}
+.note{font-size:13px;line-height:1.55;color:var(--on-dark);margin:0}
+.msg{font-size:14px;font-weight:600;color:#fff;background:var(--error);padding:10px 12px;margin:0}
+.msg[hidden]{display:none}
+</style>
+</head>
+<body>
+<header>
+<img src="arm-signet.png" alt="Arm Eggiwil AG">
+<div class="brand"><b>ARM EGGIWIL AG</b><span>Güllefass-Rechner · GPS-Tempo-Test</span></div>
+</header>
+<main>
+<div class="eyebrow">Fahransicht · GPS</div>
+
+<section class="panel" aria-live="polite">
+<div class="tempo">
+<div>
+<div class="label">Ist-Geschwindigkeit</div>
+<div class="ist"><span id="ist">–</span><small>km/h</small></div>
+<div class="soll-line">Soll <span id="sollTxt">6.0</span> km/h · ±0.5</div>
+</div>
+<div class="arrow" id="arrow" hidden>
+<div class="tile"><svg id="arrowSvg" width="68" height="68" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><path d="M12 20V5"></path><path d="M5 11l7-7 7 7"></path></svg></div>
+<div class="txt" id="arrowTxt">Schneller</div>
+</div>
+</div>
+<div class="foot"><span id="status">GPS aus</span><span id="acc">Mittelwert über 5 s</span></div>
+</section>
+
+<p class="msg" id="msg" hidden></p>
+
+<section class="soll">
+<div class="soll-row"><label class="label" for="soll">Soll-Geschwindigkeit</label><div class="soll-val"><span id="sollVal">6.0</span><small>km/h</small></div></div>
+<div class="ctrl">
+<button class="step" id="minus" type="button" aria-label="Soll um 0.5 km/h verringern"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+<input id="soll" type="range" min="0" max="15" step="0.5" value="6">
+<button class="step" id="plus" type="button" aria-label="Soll um 0.5 km/h erhöhen"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
+</div>
+</section>
+
+<button class="btn" id="start" type="button"><span>GPS starten</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
+<button class="btn line" id="demo" type="button"><span>Demo ohne GPS</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
+
+<p class="note">Pfeil hoch: schneller fahren. Pfeil runter: langsamer fahren. Kein Pfeil: im Sollbereich ±0.5 km/h. Der Bildschirm bleibt eingeschaltet, solange das GPS läuft.</p>
+</main>
+
+<script>
+(function () {
+  var TOL = 0.5, WINDOW_MS = 5000;
+  var $ = function (id) { return document.getElementById(id); };
+  var soll = 6, samples = [], last = null, watchId = null, demoTimer = null, wakeLock = null;
+
+  function fmt(n) { return n.toFixed(1); }
+
+  function setSoll(v) {
+    soll = Math.min(15, Math.max(0, Math.round(v * 2) / 2));
+    $('soll').value = soll;
+    $('soll').style.setProperty('--p', (soll / 15 * 100) + '%');
+    $('sollVal').textContent = fmt(soll);
+    $('sollTxt').textContent = fmt(soll);
+    render();
+  }
+
+  function haversine(a, b) {
+    var R = 6371000, toRad = Math.PI / 180;
+    var dLat = (b.latitude - a.latitude) * toRad, dLon = (b.longitude - a.longitude) * toRad;
+    var h = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(a.latitude * toRad) * Math.cos(b.latitude * toRad) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+
+  function addSample(kmh, t) {
+    samples.push({ v: kmh, t: t });
+    samples = samples.filter(function (s) { return t - s.t <= WINDOW_MS; });
+    render();
+  }
+
+  function average() {
+    if (!samples.length) return null;
+    var sum = 0;
+    samples.forEach(function (s) { sum += s.v; });
+    return sum / samples.length;
+  }
+
+  function render() {
+    var avg = average();
+    var arrow = $('arrow');
+    if (avg === null) { $('ist').textContent = '–'; arrow.hidden = true; return; }
+    $('ist').textContent = fmt(avg);
+    var path;
+    if (avg < soll - TOL) {
+      path = '<path d="M12 20V5"></path><path d="M5 11l7-7 7 7"></path>';
+      $('arrowTxt').textContent = 'Schneller';
+      arrow.hidden = false;
+    } else if (avg > soll + TOL) {
+      path = '<path d="M12 4v15"></path><path d="M5 13l7 7 7-7"></path>';
+      $('arrowTxt').textContent = 'Langsamer';
+      arrow.hidden = false;
+    } else {
+      arrow.hidden = true;
+    }
+    if (path) $('arrowSvg').innerHTML = path;
+  }
+
+  function showMsg(text) { $('msg').textContent = text; $('msg').hidden = !text; }
+
+  function onPos(p) {
+    var c = p.coords, t = p.timestamp || Date.now(), kmh = null;
+    if (c.speed !== null && c.speed !== undefined && !isNaN(c.speed)) {
+      kmh = Math.max(0, c.speed * 3.6);
+    } else if (last) {
+      var dt = (t - last.t) / 1000;
+      if (dt > 0.5) kmh = haversine(last.c, c) / dt * 3.6;
+    }
+    last = { c: c, t: t };
+    if (kmh !== null) addSample(kmh, t);
+    var acc = Math.round(c.accuracy);
+    $('status').textContent = 'GPS aktiv';
+    $('acc').innerHTML = acc > 20 ? '<span class="warn">Signal schwach ±' + acc + ' m</span>' : 'Genauigkeit ±' + acc + ' m';
+    showMsg('');
+  }
+
+  function onErr(e) {
+    var t = { 1: 'Standort-Zugriff wurde abgelehnt. Bitte in den Browser-Einstellungen erlauben.', 2: 'Kein GPS-Signal. Handy näher an die Scheibe halten.', 3: 'GPS antwortet nicht (Zeitüberschreitung).' };
+    showMsg(t[e.code] || 'GPS-Fehler: ' + e.message);
+    $('status').textContent = 'GPS-Fehler';
+  }
+
+  function keepAwake() {
+    if (!('wakeLock' in navigator)) return;
+    navigator.wakeLock.request('screen').then(function (l) { wakeLock = l; }).catch(function () {});
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && (watchId !== null || demoTimer)) keepAwake();
+  });
+
+  function stopAll() {
+    if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+    if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
+    if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
+    samples = []; last = null; render();
+    $('status').textContent = 'GPS aus';
+    $('acc').textContent = 'Mittelwert über 5 s';
+    $('start').firstElementChild.textContent = 'GPS starten';
+    $('demo').firstElementChild.textContent = 'Demo ohne GPS';
+  }
+
+  $('start').addEventListener('click', function () {
+    if (watchId !== null) { stopAll(); return; }
+    stopAll();
+    if (!('geolocation' in navigator)) { showMsg('Dieses Gerät bietet kein GPS im Browser an.'); return; }
+    if (!window.isSecureContext) { showMsg('GPS funktioniert nur, wenn die Seite über https:// geöffnet wird.'); return; }
+    $('status').textContent = 'GPS sucht …';
+    watchId = navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+    keepAwake();
+    $('start').firstElementChild.textContent = 'GPS stoppen';
+  });
+
+  $('demo').addEventListener('click', function () {
+    if (demoTimer) { stopAll(); return; }
+    stopAll();
+    var t0 = Date.now();
+    demoTimer = setInterval(function () {
+      var s = (Date.now() - t0) / 1000;
+      var v = soll + 1.6 * Math.sin(s / 8) + (Math.random() - 0.5) * 0.8;
+      addSample(Math.max(0, v), Date.now());
+    }, 1000);
+    keepAwake();
+    $('status').textContent = 'Demo (simuliert)';
+    $('demo').firstElementChild.textContent = 'Demo stoppen';
+  });
+
+  $('soll').addEventListener('input', function (e) { setSoll(parseFloat(e.target.value)); });
+  $('minus').addEventListener('click', function () { setSoll(soll - 0.5); });
+  $('plus').addEventListener('click', function () { setSoll(soll + 0.5); });
+  setSoll(6);
+})();
+</script>
+</body>
+</html>
