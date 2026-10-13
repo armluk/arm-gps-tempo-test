@@ -33,6 +33,10 @@ nav.tabs a[aria-current]{color:#fff;border-bottom-color:var(--yellow)}
 .stat b{font-size:20px;font-weight:900;line-height:1}
 .stat b small{font-size:11px;font-weight:700;margin-left:2px}
 .stat span{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--on-dark)}
+.stats.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.stats[hidden],.legend[hidden]{display:none}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;font-weight:600;color:var(--on-dark)}
+.legend i{display:inline-block;width:12px;height:12px;margin-right:6px;vertical-align:-1px;border:1px solid var(--fuge)}
 .status{display:flex;justify-content:space-between;gap:8px;font-size:12px;font-weight:600;color:var(--on-dark)}
 .rec-dot{display:inline-block;width:9px;height:9px;background:var(--on-dark);margin-right:6px;vertical-align:baseline}
 .rec .rec-dot{background:var(--yellow)}
@@ -88,6 +92,12 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <div class="stat"><b id="sAmount">0<small>m³</small></b><span>Menge</span></div>
 <div class="stat"><b id="sOverlap">0<small>%</small></b><span>Überlappt</span></div>
 </div>
+<div class="stats three" id="flowStats" hidden aria-live="polite">
+<div class="stat"><b id="sFlow">–<small>l/min</small></b><span>Durchfluss</span></div>
+<div class="stat"><b id="sRate">–<small>m³/ha</small></b><span>Ist-Menge</span></div>
+<div class="stat"><b id="sMeasured">0.0<small>m³</small></b><span>Gemessen</span></div>
+</div>
+<div class="legend" id="legend" hidden><span><i style="background:#FFFFFF"></i>unter 90 %</span><span><i style="background:#FFF005"></i>Soll ±10 %</span><span><i style="background:#C62828"></i>über 110 %</span></div>
 <div class="status" id="statusBar"><span id="status"><span class="rec-dot"></span>Bereit</span><span id="acc">Dauer 00:00</span></div>
 <p class="msg" id="msg" hidden></p>
 
@@ -133,6 +143,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <button class="btn line" id="dlGeo" type="button">GeoJSON</button>
 <button class="btn line" id="clear" type="button">Neu</button>
 </div>
+<button class="btn line" id="flowBtn" type="button"><span>Durchflussmesser verbinden</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
 <button class="btn line" id="demo" type="button"><span>Demo ohne GPS</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
 <p class="note">Eingefärbt wird die Fläche unter dem Verteiler (Arbeitsbreite, Abstand hinter dem Traktor), nur bei mehr als 0.5 km/h. Handy-GPS liegt oft 3–5 m daneben – kleine Lücken oder Überlappungen auf der Karte sind deshalb normal. Luftbild © swisstopo.</p>
 </section>
@@ -169,7 +180,72 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   var trackLine = L.polyline([], { color: '#FFFFFF', weight: 2, opacity: 0.8, interactive: false }).addTo(map);
   var boomLine = L.polyline([], { color: '#2E3236', weight: 5, opacity: 1, interactive: false }).addTo(map);
   var tractor = L.circleMarker([0, 0], { radius: 7, color: '#000', weight: 3, fillColor: '#FFF005', fillOpacity: 1, interactive: false });
-  var coverStyle = { stroke: false, fillColor: '#FFF005', fillOpacity: 0.45, interactive: false };
+  var YELLOW = '#FFF005', LOW = '#FFFFFF', HIGH = '#C62828';
+  function coverStyle(color) { return { stroke: false, fillColor: color || YELLOW, fillOpacity: 0.45, interactive: false }; }
+
+  // ---------- Durchflussmesser (Bluetooth LE, ESP32) ----------
+  var FLOW_SVC = '6b1f0001-4a3b-4d52-9a2e-3c1d5e7f8a90', FLOW_CHR = '6b1f0002-4a3b-4d52-9a2e-3c1d5e7f8a90';
+  var MIN_FLOW = 20, FLOW_STALE_MS = 5000;
+  var flow = { device: null, connected: false, lmin: null, total: null, t: 0 };
+  function flowLive() { return flow.connected && flow.lmin !== null && Date.now() - flow.t < FLOW_STALE_MS; }
+  function actualRate() {
+    var v = speedAvg();
+    if (!flowLive() || v === null || v <= STAND || cfg.width <= 0) return null;
+    return flow.lmin * 0.6 / (v * cfg.width);   // m³/ha = l/min × 0.6 ÷ (km/h × m)
+  }
+  function rateColor() {
+    var ar = actualRate();
+    if (ar === null || cfg.rate <= 0) return YELLOW;
+    return ar < cfg.rate * 0.9 ? LOW : ar > cfg.rate * 1.1 ? HIGH : YELLOW;
+  }
+  // Farbklassen für Karte und Export (KML-Farbe: aabbggrr)
+  var CLASSES = [
+    { color: YELLOW, name: 'Überfahrene Fläche (Soll ±10 %)', kml: '7305f0ff' },
+    { color: LOW, name: 'Zu wenig (unter 90 % Soll)', kml: '73ffffff' },
+    { color: HIGH, name: 'Zu viel (über 110 % Soll)', kml: '732828c6' }
+  ];
+
+  function onFlowValue(text) {
+    var parts = String(text).split(';');
+    var lmin = parseFloat(parts[0]), total = parseFloat(parts[1]);
+    if (isNaN(lmin) || isNaN(total)) return;
+    flow.lmin = Math.max(0, lmin); flow.total = total; flow.t = Date.now();
+    if (rec && rec.total0 === null) rec.total0 = total;
+    render();
+  }
+  function setFlowBtn(text) { $('flowBtn').firstElementChild.textContent = text; }
+  function connectFlow() {
+    if (!flow.device) return Promise.reject(new Error('kein Gerät'));
+    setFlowBtn('Verbinde …');
+    return flow.device.gatt.connect()
+      .then(function (server) { return server.getPrimaryService(FLOW_SVC); })
+      .then(function (svc) { return svc.getCharacteristic(FLOW_CHR); })
+      .then(function (chr) {
+        chr.addEventListener('characteristicvaluechanged', function (e) { onFlowValue(new TextDecoder().decode(e.target.value)); });
+        return chr.startNotifications();
+      })
+      .then(function () { flow.connected = true; setFlowBtn('Durchflussmesser verbunden ✓'); showMsg(''); render(); });
+  }
+  $('flowBtn').addEventListener('click', function () {
+    if (flow.connected && flow.device) { flow.connected = false; flow.device.gatt.disconnect(); return; }
+    if (!navigator.bluetooth) { showMsg('Bluetooth wird in diesem Browser nicht unterstützt. Bitte Chrome auf Android verwenden.'); return; }
+    navigator.bluetooth.requestDevice({ filters: [{ services: [FLOW_SVC] }] })
+      .then(function (dev) {
+        flow.device = dev;
+        dev.addEventListener('gattserverdisconnected', function () {
+          var wanted = flow.connected;
+          flow.connected = false; render();
+          if (!wanted) { setFlowBtn('Durchflussmesser verbinden'); return; }
+          setFlowBtn('Verbindung verloren – verbinde neu …');
+          setTimeout(function retry() { if (!flow.device) return; connectFlow().catch(function () { setTimeout(retry, 3000); }); }, 1000);
+        });
+        return connectFlow();
+      })
+      .catch(function (e) {
+        setFlowBtn('Durchflussmesser verbinden');
+        if (e && e.name !== 'NotFoundError') showMsg('Durchflussmesser nicht verbunden: ' + (e.message || e));
+      });
+  });
 
   // ---------- Zustand ----------
   var cfg = { width: 12, offset: 3, rate: 25, source: 'phone', aOffset: 0, aSide: 0 };
@@ -185,7 +261,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   var rec = null, saved = null, watchId = null, demoTimer = null, wakeLock = null, follow = true, lastLL = null, samples = [], clockTimer = null;
 
   function newRec() {
-    return { origin: null, prevBoom: null, ref: null, quads: [], track: [], cells: new Set(), sum: 0, start: Date.now(), end: null };
+    return { origin: null, prevBoom: null, ref: null, quads: [], colors: [], track: [], cells: new Set(), sum: 0, start: Date.now(), end: null, total0: null };
   }
 
   // lokale Meter-Koordinaten um den ersten Punkt
@@ -218,7 +294,8 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   function stats() {
     if (rec) {
       var area = rec.cells.size / 10000;
-      return { area: area, overlap: rec.sum > 0 ? Math.max(0, rec.sum - rec.cells.size) / rec.sum * 100 : 0, ms: (rec.end || Date.now()) - rec.start };
+      var measured = rec.total0 !== null && flow.total !== null ? Math.max(0, flow.total - rec.total0) / 1000 : null;
+      return { area: area, overlap: rec.sum > 0 ? Math.max(0, rec.sum - rec.cells.size) / rec.sum * 100 : 0, ms: (rec.end || Date.now()) - rec.start, measured: measured };
     }
     if (saved) return saved.stats;
     return { area: 0, overlap: 0, ms: 0 };
@@ -229,9 +306,18 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     $('sSpeed').innerHTML = (v === null ? '–' : v <= STAND ? '–' : v.toFixed(1)) + '<small>km/h</small>';
     var st = stats();
     $('sArea').innerHTML = st.area.toFixed(2) + '<small>ha</small>';
-    $('sAmount').innerHTML = Math.round(st.area * (st.rate || cfg.rate)) + '<small>m³</small>';
+    var amount = st.measured !== null && st.measured !== undefined ? st.measured : st.area * (st.rate || cfg.rate);
+    $('sAmount').innerHTML = Math.round(amount) + '<small>m³</small>';
     $('sOverlap').innerHTML = Math.round(st.overlap) + '<small>%</small>';
     $('acc').textContent = 'Dauer ' + mmss(st.ms);
+    var showFlow = flow.connected || (st.measured !== null && st.measured !== undefined);
+    $('flowStats').hidden = !showFlow; $('legend').hidden = !showFlow;
+    if (showFlow) {
+      $('sFlow').innerHTML = (flowLive() ? Math.round(flow.lmin).toLocaleString('de-CH').replace(/[’’]/g, "'") : '–') + '<small>l/min</small>';
+      var ar = actualRate();
+      $('sRate').innerHTML = (ar === null ? '–' : ar.toFixed(0)) + '<small>m³/ha</small>';
+      $('sMeasured').innerHTML = (st.measured !== null && st.measured !== undefined ? st.measured.toFixed(1) : '0.0') + '<small>m³</small>';
+    }
   }
   function setStatus(text, recording) { $('status').innerHTML = '<span class="rec-dot"></span>' + text; $('statusBar').className = 'status' + (recording ? ' rec' : ''); }
   function showMsg(t) { $('msg').textContent = t; $('msg').hidden = !t; }
@@ -294,6 +380,8 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 
     var v = speedAvg();
     if (v === null || v <= STAND || h === null) { rec.prevBoom = null; boomLine.setLatLngs([]); render(); return; }
+    // mit Durchflussmesser: nur einfärben, wenn tatsächlich Gülle fliesst
+    if (flow.connected && (!flowLive() || flow.lmin < MIN_FLOW)) { rec.prevBoom = null; boomLine.setLatLngs([]); render(); return; }
 
     var f = { x: Math.sin(h), y: Math.cos(h) }, r = { x: Math.cos(h), y: -Math.sin(h) };
     // Verteiler-Mitte: hinter dem Positionspunkt (Abstand) und bei der Antenne ggf. seitlich versetzt
@@ -312,8 +400,9 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (rec.prevBoom && dist(rec.prevBoom.c, c) < MAX_JUMP) {
       var q = [rec.prevBoom.l, rec.prevBoom.r, br, bl];
       var ll = q.map(function (pt) { return toLL(rec.origin, pt); });
-      rec.quads.push(ll);
-      L.polygon(ll, coverStyle).addTo(coverLayer);
+      var col = rateColor();
+      rec.quads.push(ll); rec.colors.push(col);
+      L.polygon(ll, coverStyle(col)).addTo(coverLayer);
       rec.sum += shoelace(q);
       rasterize(rec, q);
     }
@@ -333,6 +422,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     coverLayer.clearLayers(); trackLine.setLatLngs([]); boomLine.setLatLngs([]);
     saved = null; samples = [];
     rec = newRec();
+    if (flow.total !== null) rec.total0 = flow.total;
     keepAwake();
     clockTimer = setInterval(render, 1000);
     $('startStop').className = 'btn stop';
@@ -350,7 +440,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (rec) {
       rec.end = Date.now();
       var st = stats(); st.rate = cfg.rate;
-      saved = { quads: rec.quads, track: rec.track, stats: st, cfg: JSON.parse(JSON.stringify(cfg)), date: new Date(rec.start).toISOString() };
+      saved = { quads: rec.quads, colors: rec.colors, track: rec.track, stats: st, cfg: JSON.parse(JSON.stringify(cfg)), date: new Date(rec.start).toISOString() };
       var stored = true;
       try { localStorage.setItem(STORE, JSON.stringify(saved)); } catch (e) { stored = false; showMsg('Karte konnte auf diesem Gerät nicht gespeichert werden. Bitte herunterladen.'); }
       rec = null;
@@ -361,6 +451,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     $('startStop').firstElementChild.textContent = 'Aufzeichnung starten';
     $('demo').firstElementChild.textContent = 'Demo ohne GPS';
     setStatus(stored === false ? 'Gestoppt · nicht gespeichert' : 'Gestoppt · gespeichert', false);
+    if (flow.fake) flow = { device: null, connected: false, lmin: null, total: null, t: 0 };
     render();
   }
 
@@ -396,10 +487,18 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     $('demo').firstElementChild.textContent = 'Demo stoppen';
     setStatus('Demo (simuliert)', true);
     var o = { lat: 46.8728, lon: 7.8005 }, lane = 0, along = 0, dir = 1, turn = 0, L0 = 160, v = 7 / 3.6;
+    // ohne echten Durchflussmesser: Durchfluss simulieren (Bahn 2 zu wenig, Bahn 4 zu viel)
+    var simFlow = !flow.connected;
+    if (simFlow) { flow = { device: null, connected: true, fake: true, lmin: 0, total: 0, t: Date.now() }; rec.total0 = 0; }
+    var factors = [1, 0.8, 1, 1.25, 1, 1];
     demoTimer = setInterval(function () {
       var kmh;
       if (turn > 0) { turn--; kmh = 0.3; if (turn === 0) { lane++; dir = -dir; } }
       else { along += dir * v; kmh = 7 + (Math.random() - 0.5); if (along > L0 || along < 0) { along = Math.max(0, Math.min(L0, along)); turn = 4; } }
+      if (simFlow) {
+        var q = turn > 0 ? 0 : cfg.rate * 7 * cfg.width / 0.6 * (factors[lane] || 1);
+        flow.lmin = q; flow.total += q / 60; flow.t = Date.now();
+      }
       var x = lane * cfg.width * 0.95 + (turn > 0 ? cfg.width * 0.95 * (4 - turn) / 4 : 0) + (Math.random() - 0.5) * 1.2;
       var y = along + (Math.random() - 0.5) * 1.2;
       var ll = toLL(o, { x: x, y: y });
@@ -420,7 +519,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   });
 
   function current() {
-    if (rec) return { quads: rec.quads, track: rec.track, stats: stats(), cfg: cfg, date: new Date(rec.start).toISOString() };
+    if (rec) return { quads: rec.quads, colors: rec.colors, track: rec.track, stats: stats(), cfg: cfg, date: new Date(rec.start).toISOString() };
     return saved;
   }
   function download(name, type, text) {
@@ -432,25 +531,35 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   }
   function fileBase(d) { return 'guelle-karte-' + d.date.slice(0, 16).replace(/[:T]/g, '-'); }
   function props(d) {
-    return { datum: d.date, flaeche_ha: Number(d.stats.area.toFixed(3)), menge_m3: Math.round(d.stats.area * (d.stats.rate || d.cfg.rate)), ueberlappung_prozent: Math.round(d.stats.overlap), arbeitsbreite_m: d.cfg.width, positionsquelle: d.cfg.source === 'antenna' ? 'Antenne' : 'Handy', abstand_verteiler_m: d.cfg.source === 'antenna' ? d.cfg.aOffset : d.cfg.offset, seitlicher_versatz_m: d.cfg.source === 'antenna' ? d.cfg.aSide : 0, ausbringmenge_m3_ha: d.cfg.rate };
+    var measured = d.stats.measured !== null && d.stats.measured !== undefined;
+    return { datum: d.date, flaeche_ha: Number(d.stats.area.toFixed(3)), menge_m3: measured ? Number(d.stats.measured.toFixed(1)) : Math.round(d.stats.area * (d.stats.rate || d.cfg.rate)), menge_quelle: measured ? 'Durchflussmesser' : 'berechnet', ueberlappung_prozent: Math.round(d.stats.overlap), arbeitsbreite_m: d.cfg.width, positionsquelle: d.cfg.source === 'antenna' ? 'Antenne' : 'Handy', abstand_verteiler_m: d.cfg.source === 'antenna' ? d.cfg.aOffset : d.cfg.offset, seitlicher_versatz_m: d.cfg.source === 'antenna' ? d.cfg.aSide : 0, ausbringmenge_m3_ha: d.cfg.rate };
   }
   $('dlGeo').addEventListener('click', function () {
     var d = current(); if (!d || !d.quads.length) { showMsg('Noch keine Fläche aufgezeichnet.'); return; }
-    var gj = { type: 'FeatureCollection', features: [
-      { type: 'Feature', properties: props(d), geometry: { type: 'MultiPolygon', coordinates: d.quads.map(function (q) { var r = q.map(function (p) { return [p[1], p[0]]; }); r.push(r[0]); return [r]; }) } },
-      { type: 'Feature', properties: { name: 'Fahrspur' }, geometry: { type: 'LineString', coordinates: d.track.map(function (p) { return [p[1], p[0]]; }) } }
-    ] };
+    var base = props(d);
+    var features = CLASSES.map(function (cl) {
+      var qs = d.quads.filter(function (q, i) { return ((d.colors && d.colors[i]) || YELLOW) === cl.color; });
+      if (!qs.length) return null;
+      return { type: 'Feature', properties: Object.assign({ klasse: cl.name }, base), geometry: { type: 'MultiPolygon', coordinates: qs.map(function (q) { var r = q.map(function (p) { return [p[1], p[0]]; }); r.push(r[0]); return [r]; }) } };
+    }).filter(Boolean);
+    features.push({ type: 'Feature', properties: { name: 'Fahrspur' }, geometry: { type: 'LineString', coordinates: d.track.map(function (p) { return [p[1], p[0]]; }) } });
+    var gj = { type: 'FeatureCollection', features: features };
     download(fileBase(d) + '.geojson', 'application/geo+json', JSON.stringify(gj));
   });
   $('dlKml').addEventListener('click', function () {
     var d = current(); if (!d || !d.quads.length) { showMsg('Noch keine Fläche aufgezeichnet.'); return; }
     var p = props(d);
-    var polys = d.quads.map(function (q) { var r = q.concat([q[0]]); return '<Polygon><outerBoundaryIs><LinearRing><coordinates>' + r.map(function (pt) { return pt[1].toFixed(7) + ',' + pt[0].toFixed(7) + ',0'; }).join(' ') + '</coordinates></LinearRing></outerBoundaryIs></Polygon>'; }).join('');
+    function poly(q) { var r = q.concat([q[0]]); return '<Polygon><outerBoundaryIs><LinearRing><coordinates>' + r.map(function (pt) { return pt[1].toFixed(7) + ',' + pt[0].toFixed(7) + ',0'; }).join(' ') + '</coordinates></LinearRing></outerBoundaryIs></Polygon>'; }
+    var styles = '', marks = '';
+    CLASSES.forEach(function (cl, n) {
+      var qs = d.quads.filter(function (q, i) { return ((d.colors && d.colors[i]) || YELLOW) === cl.color; });
+      if (!qs.length) return;
+      styles += '<Style id="f' + n + '"><LineStyle><width>0</width></LineStyle><PolyStyle><color>' + cl.kml + '</color><outline>0</outline></PolyStyle></Style>';
+      marks += '<Placemark><name>' + cl.name + '</name><description>Fläche ' + p.flaeche_ha + ' ha · Menge ' + p.menge_m3 + ' m³ (' + p.menge_quelle + ') · Überlappung ' + p.ueberlappung_prozent + ' % · Arbeitsbreite ' + p.arbeitsbreite_m + ' m · Soll ' + p.ausbringmenge_m3_ha + ' m³/ha</description><styleUrl>#f' + n + '</styleUrl><MultiGeometry>' + qs.map(poly).join('') + '</MultiGeometry></Placemark>';
+    });
     var line = '<LineString><coordinates>' + d.track.map(function (pt) { return pt[1].toFixed(7) + ',' + pt[0].toFixed(7) + ',0'; }).join(' ') + '</coordinates></LineString>';
-    var kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Gülle-Karte ' + p.datum.slice(0, 10) + '</name>' +
-      '<Style id="f"><LineStyle><width>0</width></LineStyle><PolyStyle><color>73' + '05F0FF'.toLowerCase() + '</color><outline>0</outline></PolyStyle></Style>' +
-      '<Style id="t"><LineStyle><color>ffffffff</color><width>2</width></LineStyle></Style>' +
-      '<Placemark><name>Überfahrene Fläche</name><description>Fläche ' + p.flaeche_ha + ' ha · Menge ' + p.menge_m3 + ' m³ · Überlappung ' + p.ueberlappung_prozent + ' % · Arbeitsbreite ' + p.arbeitsbreite_m + ' m</description><styleUrl>#f</styleUrl><MultiGeometry>' + polys + '</MultiGeometry></Placemark>' +
+    var kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Gülle-Karte ' + p.datum.slice(0, 10) + '</name>' + styles +
+      '<Style id="t"><LineStyle><color>ffffffff</color><width>2</width></LineStyle></Style>' + marks +
       '<Placemark><name>Fahrspur</name><styleUrl>#t</styleUrl>' + line + '</Placemark></Document></kml>';
     download(fileBase(d) + '.kml', 'application/vnd.google-earth.kml+xml', kml);
   });
@@ -462,7 +571,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   try {
     saved = JSON.parse(localStorage.getItem(STORE));
     if (saved && saved.quads && saved.quads.length) {
-      saved.quads.forEach(function (q) { L.polygon(q, coverStyle).addTo(coverLayer); });
+      saved.quads.forEach(function (q, i) { L.polygon(q, coverStyle(saved.colors && saved.colors[i])).addTo(coverLayer); });
       trackLine.setLatLngs(saved.track);
       map.fitBounds(L.latLngBounds(saved.track), { padding: [20, 20] });
       follow = false;
