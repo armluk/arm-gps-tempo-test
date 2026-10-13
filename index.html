@@ -89,7 +89,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <button class="btn" id="start" type="button"><span>GPS starten</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
 <button class="btn line" id="demo" type="button"><span>Demo ohne GPS</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
 
-<p class="note">Pfeil hoch: schneller fahren. Pfeil runter: langsamer fahren. Kein Pfeil: im Sollbereich ±0.5 km/h. «=» bedeutet Stillstand (0.5 km/h oder weniger). Der Bildschirm bleibt eingeschaltet, solange das GPS läuft.</p>
+<p class="note">Pfeil hoch: schneller fahren. Pfeil runter: langsamer fahren. Kein Pfeil: im Sollbereich ±0.5 km/h. «=» bedeutet Stillstand (0.5 km/h oder weniger), die Geschwindigkeit zeigt dann «–». Der Bildschirm bleibt eingeschaltet, solange das GPS läuft.</p>
 </main>
 
 <script>
@@ -136,9 +136,10 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     $('istLabel').textContent = 'Ist-Geschwindigkeit';
     if (avg === null) { $('ist').textContent = '–'; arrow.hidden = true; return; }
     if (avg <= STAND) {
-      $('ist').textContent = '=';
-      $('istLabel').textContent = 'Stillstand';
-      arrow.hidden = true;
+      $('ist').textContent = '–';
+      $('arrowSvg').innerHTML = '<path d="M5 9h14"></path><path d="M5 15h14"></path>';
+      $('arrowTxt').textContent = 'Stillstand';
+      arrow.hidden = false;
       return;
     }
     $('ist').textContent = fmt(avg);
