@@ -10,8 +10,8 @@ Arm Eggiwil AG · Entwurf V2, 13.10.2026 · Stand: Konzept, noch nicht gefertigt
   1. **VIN** – Versorgung **8 … 30 V DC**
   2. **GND** – Masse (gemeinsam für Versorgung und Signal)
   3. **SIG** – Impulssignal vom Klemme **D** des KROHNE OPTIFLUX 1000 (1 Impuls = 1 Liter).
-     **D–** liegt auf +, der **1-kΩ-Pulldown von D nach GND sitzt am Sensor** (nicht in Serie, nicht auf der Platine).
-     Die Platine greift das Signal nur hochohmig ab.
+     **D–** liegt auf +. Der **1-kΩ-Pulldown von D nach GND sitzt auf der Platine (R2)** – parallel zum Signal,
+     nicht in Serie. Am Sensor muss kein Widerstand mehr angeschlossen werden.
 
 Schema zur Kontrolle: [platine-schema.svg](platine-schema.svg)
 - Der ATOM Lite wird über ein **gekürztes Grove-Kabel (HY2.0-4P)** angelötet und bekommt darüber 5 V und das
@@ -28,11 +28,12 @@ Schema zur Kontrolle: [platine-schema.svg](platine-schema.svg)
  Litze GND ─────────────────────┴──────┴───────────────┴──────── GND ────┼────────────────┴──┐
                                                                          │                   │
                                                                    Grove rot (5V)      Grove schwarz (GND)
- Litze SIG ────────────── R1 3.3k ──┬──► U1 PC817 Pin 1 (Anode)
-                                    D3 1N4148 (Kathode an Pin 1, Anode an Pin 2)
-                         GND ───────┴──► U1 Pin 2 (Kathode)
-
- (1-kΩ-Pulldown D → GND sitzt am Sensor, siehe platine-schema.svg)
+ Litze SIG ──┬─────────── R1 3.3k ──┬──► U1 PC817 Pin 1 (Anode)
+             │                      D3 1N4148 (Kathode an Pin 1, Anode an Pin 2)
+             R2 1k / 2 W            │
+             (Pulldown)  GND ───────┴──► U1 Pin 2 (Kathode)
+             │
+            GND
                                          U1 Pin 4 (Kollektor) ──► Grove gelb (G26)
                                          U1 Pin 3 (Emitter)   ──► GND
 ```
@@ -48,9 +49,9 @@ Der Optokoppler schützt den ESP32 (3.3 V) vor dem 8–30-V-Signal.
 | **VIN_RAW** | Lötpad P1 (Litze VIN) · F1 Pin 1 |
 | **VIN_F** | F1 Pin 2 · D1 Anode |
 | **VIN** | D1 Kathode · D2 Kathode · C1 + · U2 Pin 1 (VIN) |
-| **GND** | Lötpad P2 (Litze GND) · D2 Anode · C1 − · U2 Pin 2 (GND) · C2 − · U1 Pin 2 · D3 Anode · U1 Pin 3 · Lötpad P5 (Grove schwarz) |
+| **GND** | Lötpad P2 (Litze GND) · D2 Anode · C1 − · U2 Pin 2 (GND) · C2 − · R2 Pin 2 · U1 Pin 2 · D3 Anode · U1 Pin 3 · Lötpad P5 (Grove schwarz) |
 | **+5V** | U2 Pin 3 (VOUT) · C2 + · Lötpad P4 (Grove rot) |
-| **SIG** | Lötpad P3 (Litze SIG) · R1 Pin 1 |
+| **SIG** | Lötpad P3 (Litze SIG) · R2 Pin 1 · R1 Pin 1 |
 | **LED_A** | R1 Pin 2 · U1 Pin 1 · D3 Kathode |
 | **G26** | U1 Pin 4 · Lötpad P6 (Grove gelb) |
 
@@ -69,14 +70,21 @@ Grove-Ader Weiss (G32) wird nicht verwendet – kurz abschneiden und isolieren.
 | U2 | Schaltregler-Modul | **TRACO TSR 1-2450** (6.5–36 V ein, 5 V / 1 A aus) | deckt 8–30 V mit Reserve ab |
 | C2 | Elko | 22 µF / 10 V, radial | |
 | R1 | Widerstand | 3.3 kΩ, 0.5 W | LED-Strom ≈ 2 mA bei 8 V, ≈ 9 mA bei 30 V |
+| R2 | Widerstand | **1 kΩ, 2 W** | Pulldown SIG → GND (ersetzt den Widerstand am Sensor) |
 | D3 | Diode | 1N4148 | schützt die Optokoppler-LED |
 | U1 | Optokoppler | PC817, DIP-4 | |
 | – | M5Stack ATOM Lite + Grove-Kabel | | Kabel auf ca. 5 cm kürzen, Adern verzinnen |
 
 ## Wichtige Hinweise
 
-- **Belastung des Impulsausgangs:** Der bestehende 1-kΩ-Pulldown am Sensor bleibt wie er ist. Die Platine braucht
-  zusätzlich nur ca. 2–9 mA (über R1 in den Optokoppler).
+- **R2 wird warm:** Solange der Impuls ansteht, fliessen bei 12 V 12 mA (≈ 0.14 W), bei 24 V 24 mA (≈ 0.6 W),
+  bei 30 V 30 mA (≈ 0.9 W). Deshalb **2 W**, mit etwas Abstand zur Platine montieren, damit die Wärme in die
+  Vergussmasse abgegeben wird. Zusammen mit R1 belastet die Platine den Impulsausgang mit bis zu ca. 40 mA bei 30 V –
+  gleich viel wie bisher plus wenige mA.
+- **Wichtig für das bestehende Gerät:** Wird der Widerstand am Sensor entfernt, hängt dessen Pulldown jetzt an der
+  Platine. Ist die Platine einmal abgeklemmt, fehlt der Pulldown auch dem bestehenden Gerät – dann den Widerstand
+  am Sensor wieder einsetzen oder die Platine angeschlossen lassen. **Nicht beide gleichzeitig** (sonst 500 Ω,
+  doppelte Belastung).
 - **Spannungsspitzen:** Der TSR 1-2450 ist bis 36 V angegeben. D2 begrenzt grössere Spitzen, kann sie bei sehr
   energiereichen Störungen aber nicht ganz unter 36 V halten. Für ein Traktor-Bordnetz ist das in der Regel
   ausreichend; eine Garantie ist es nicht.

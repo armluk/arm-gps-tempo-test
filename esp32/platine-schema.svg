@@ -10,7 +10,7 @@
     .dot{fill:#2E3236}
   </style>
 
-  <text x="20" y="28" class="h">Durchfluss-Sender Güllefass – Platinenschema V3 (zur Kontrolle)</text>
+  <text x="20" y="28" class="h">Durchfluss-Sender Güllefass – Platinenschema V4 (zur Kontrolle)</text>
   <text x="20" y="46" class="sm">Arm Eggiwil AG · 13.10.2026 · Entwurf, nicht geprüft</text>
 
   <!-- ================= Sensor-Seite ================= -->
@@ -47,13 +47,12 @@
   <polyline class="w" points="250,380 250,480 600,480"/>
   <text x="256" y="474" class="sm">D = Impuls</text>
   <!-- Pulldown 1k am Sensor -->
-  <circle class="dot" cx="300" cy="480" r="4"/>
-  <line class="w" x1="300" y1="480" x2="300" y2="505"/>
-  <rect class="box" x="292" y="505" width="16" height="45"/>
-  <line class="w" x1="300" y1="550" x2="300" y2="580"/>
-  <circle class="dot" cx="300" cy="580" r="4"/>
-  <text x="200" y="525" class="lbl">1 kΩ</text>
-  <text x="168" y="541" class="sm">Pulldown am Sensor</text>
+  <circle cx="300" cy="480" r="4" fill="#9AA3A8"/>
+  <line class="opt" x1="300" y1="480" x2="300" y2="505"/>
+  <rect x="292" y="505" width="16" height="45" fill="#FFFFFF" stroke="#9AA3A8" stroke-width="2" stroke-dasharray="6 4"/>
+  <line class="opt" x1="300" y1="550" x2="300" y2="580"/>
+  <text x="168" y="525" class="sm">1 kΩ am Sensor entfällt</text>
+  <text x="168" y="541" class="sm">→ jetzt R2 auf der Platine</text>
   <!-- Kreuzung N-Leitung / Signal: nicht verbunden -->
   <!-- bestehendes Gerät -->
   <circle class="dot" cx="420" cy="480" r="4"/>
@@ -136,12 +135,13 @@
   <!-- Signal: P3 -> R1 -> Optokoppler -->
   <line class="w" x1="606" y1="480" x2="690" y2="480"/>
   <!-- R2 optional -->
-  <circle cx="640" cy="480" r="4" fill="#9AA3A8"/>
-  <line class="opt" x1="640" y1="480" x2="640" y2="510"/>
-  <rect x="632" y="510" width="16" height="40" fill="#FFFFFF" stroke="#9AA3A8" stroke-width="2" stroke-dasharray="6 4"/>
-  <line class="opt" x1="640" y1="550" x2="640" y2="580"/>
-  <text x="652" y="526" class="sm">R2 1 kΩ – entfällt</text>
-  <text x="652" y="540" class="sm">(Pulldown sitzt am Sensor)</text>
+  <circle class="dot" cx="640" cy="480" r="4"/>
+  <line class="w" x1="640" y1="480" x2="640" y2="510"/>
+  <rect class="box" x="632" y="510" width="16" height="40"/>
+  <line class="w" x1="640" y1="550" x2="640" y2="580"/>
+  <circle class="dot" cx="640" cy="580" r="4"/>
+  <text x="652" y="526" class="lbl">R2 1 kΩ / 2 W</text>
+  <text x="652" y="540" class="sm">Pulldown SIG → GND</text>
   <!-- R1 senkrecht -->
   <line class="w" x1="690" y1="480" x2="690" y2="440"/>
   <rect class="box" x="682" y="390" width="16" height="50"/>
