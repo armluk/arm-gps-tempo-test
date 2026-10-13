@@ -50,6 +50,9 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 .note{font-size:13px;line-height:1.55;color:var(--on-dark);margin:0}
 .msg{font-size:14px;font-weight:600;color:#fff;background:var(--error);padding:10px 12px;margin:0}
 .msg[hidden]{display:none}
+nav.tabs{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--surface)}
+nav.tabs a{display:flex;align-items:center;justify-content:center;min-height:44px;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--on-dark);text-decoration:none;border-bottom:4px solid transparent}
+nav.tabs a[aria-current]{color:#fff;border-bottom-color:var(--yellow)}
 </style>
 </head>
 <body>
@@ -57,6 +60,10 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <img src="arm-signet.png" alt="Arm Eggiwil AG">
 <div class="brand"><b>ARM EGGIWIL AG</b><span>Güllefass-Rechner · GPS-Tempo-Test</span></div>
 </header>
+<nav class="tabs" aria-label="Ansicht">
+<a href="index.html" aria-current="page">Tempo</a>
+<a href="karte.html">Karte</a>
+</nav>
 <main>
 <div class="eyebrow">Fahransicht · GPS</div>
 
