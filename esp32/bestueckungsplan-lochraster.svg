@@ -55,7 +55,7 @@
   <polyline class="w led" points="240,290 270,290"/>
   <polyline class="w led" points="240,290 240,320"/>
   <!-- D10 -->
-  <polyline class="w d10" points="360,320 390,320 390,350 690,350 690,200 660,200"/>
+  <polyline class="w d10" points="360,320 390,320 390,350 690,350 690,230 660,230"/>
 
   <!-- ===== Bauteile (Oberseite) ===== -->
   <!-- Litzen-Pads -->
