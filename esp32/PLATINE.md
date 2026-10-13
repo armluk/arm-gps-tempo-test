@@ -103,3 +103,8 @@ Am 5V-Pin liegen danach ca. 4.6 V; der XIAO macht daraus selbst 3.3 V.
 Grösse ca. **45 × 25 mm**, 2 Lagen, alle Bauteile oben. Litzen-Pads an einer Schmalseite (VIN · GND · SIG),
 XIAO an der gegenüberliegenden Seite mit USB-C zur Kante. Massefläche unten – **nicht unter dem Antennenbereich des XIAO**.
 Zeichnen in KiCad oder EasyEDA, fertigen z. B. bei JLCPCB, Aisler oder PCBWay.
+
+## Aufbau auf Lochraster
+
+Bestückungsplan: [bestueckungsplan-lochraster.svg](bestueckungsplan-lochraster.svg) (Ansicht von oben, Drähte auf der Unterseite).
+

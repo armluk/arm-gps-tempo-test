@@ -1,0 +1,197 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 860" width="1120" height="860" font-family="Arial, Helvetica, sans-serif" font-size="13">
+  <rect width="1120" height="860" fill="#FFFFFF"/>
+  <defs>
+    <pattern id="holes" width="30" height="30" patternUnits="userSpaceOnUse" x="45" y="65">
+      <circle cx="15" cy="15" r="5" fill="#C9A86A" stroke="#8C6D32" stroke-width="1"/>
+      <circle cx="15" cy="15" r="2" fill="#FFFFFF"/>
+    </pattern>
+  </defs>
+  <style>
+    .t{fill:#2E3236}.s{font-size:11px;fill:#5B6267}.h{font-size:15px;font-weight:bold;fill:#2E3236}
+    .w{fill:none;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+    .vin{stroke:#C62828}.v5{stroke:#E08A00}.gnd{stroke:#2E3236}.sig{stroke:#1E6FD9}.led{stroke:#7B3FB5}.d10{stroke:#0F8A5F}
+    .j{stroke:#FFFFFF;stroke-width:1.5}
+  </style>
+
+  <text x="20" y="28" class="h">Bestückungsplan Lochraster – Durchfluss-Sender (XIAO nRF52840) · Ansicht von OBEN</text>
+  <text x="20" y="46" class="s">Raster 2.54 mm · Spalten 1–23, Zeilen 1–11 (ca. 58 × 28 mm) · Drähte liegen auf der UNTERSEITE und sind hier «durchscheinend» von oben gezeichnet · Entwurf, vor dem Löten probestecken</text>
+
+  <!-- Platine -->
+  <rect x="40" y="60" width="700" height="340" fill="#E9D9B0" stroke="#8C6D32" stroke-width="1.5"/>
+  <rect x="45" y="65" width="690" height="330" fill="url(#holes)"/>
+
+  <!-- Spalten-/Zeilennummern -->
+  <g class="s" text-anchor="middle">
+    <text x="60" y="56">1</text><text x="90" y="56">2</text><text x="120" y="56">3</text><text x="150" y="56">4</text><text x="180" y="56">5</text><text x="210" y="56">6</text><text x="240" y="56">7</text><text x="270" y="56">8</text><text x="300" y="56">9</text><text x="330" y="56">10</text><text x="360" y="56">11</text><text x="390" y="56">12</text><text x="420" y="56">13</text><text x="450" y="56">14</text><text x="480" y="56">15</text><text x="510" y="56">16</text><text x="540" y="56">17</text><text x="570" y="56">18</text><text x="600" y="56">19</text><text x="630" y="56">20</text><text x="660" y="56">21</text><text x="690" y="56">22</text><text x="720" y="56">23</text>
+  </g>
+  <g class="s" text-anchor="end">
+    <text x="34" y="84">1</text><text x="34" y="114">2</text><text x="34" y="144">3</text><text x="34" y="174">4</text><text x="34" y="204">5</text><text x="34" y="234">6</text><text x="34" y="264">7</text><text x="34" y="294">8</text><text x="34" y="324">9</text><text x="34" y="354">10</text><text x="34" y="384">11</text>
+  </g>
+
+  <!-- ===== Drähte / Lötbrücken (Unterseite) ===== -->
+  <!-- VIN -->
+  <polyline class="w vin" points="60,110 90,110"/>
+  <polyline class="w vin" points="150,110 180,110"/>
+  <polyline class="w vin" points="300,110 330,110"/>
+  <polyline class="w vin" points="300,110 300,140 270,140"/>
+  <!-- +5V -->
+  <polyline class="w v5" points="390,110 390,140"/>
+  <polyline class="w v5" points="390,110 390,80 720,80"/>
+  <polyline class="w v5" points="720,140 660,140"/>
+  <!-- GND -->
+  <polyline class="w gnd" points="60,230 390,230"/>
+  <polyline class="w gnd" points="90,230 90,260"/>
+  <polyline class="w gnd" points="270,200 270,230"/>
+  <polyline class="w gnd" points="300,170 300,230"/>
+  <polyline class="w gnd" points="360,110 360,230"/>
+  <polyline class="w gnd" points="390,170 390,230"/>
+  <polyline class="w gnd" points="330,230 330,380"/>
+  <polyline class="w gnd" points="240,380 720,380 720,170 660,170"/>
+  <polyline class="w gnd" points="270,320 300,320 300,380"/>
+  <polyline class="w gnd" points="360,350 360,380"/>
+  <!-- SIG -->
+  <polyline class="w sig" points="60,320 120,320 120,290"/>
+  <!-- LED_A -->
+  <polyline class="w led" points="240,290 270,290"/>
+  <polyline class="w led" points="240,290 240,320"/>
+  <!-- D10 -->
+  <polyline class="w d10" points="360,320 390,320 390,350 690,350 690,200 660,200"/>
+
+  <!-- ===== Bauteile (Oberseite) ===== -->
+  <!-- Litzen-Pads -->
+  <g>
+    <circle cx="60" cy="110" r="8" fill="#C62828"/><text x="10" y="114" class="t" font-weight="bold">VIN</text>
+    <circle cx="60" cy="230" r="8" fill="#2E3236"/><text x="8" y="234" class="t" font-weight="bold">GND</text>
+    <circle cx="60" cy="320" r="8" fill="#1E6FD9"/><text x="12" y="324" class="t" font-weight="bold">SIG</text>
+  </g>
+
+  <!-- F1 PTC (2,2)-(4,2) -->
+  <ellipse cx="120" cy="104" rx="24" ry="12" fill="#F2C94C" stroke="#8C6D32" opacity=".9"/>
+  <circle cx="90" cy="110" r="4" fill="#555"/><circle cx="150" cy="110" r="4" fill="#555"/>
+  <text x="120" y="96" class="t" text-anchor="middle" font-weight="bold">F1</text>
+
+  <!-- D1 1N5819 (5,2)-(9,2), Kathode bei 9 -->
+  <line x1="180" y1="110" x2="300" y2="110" stroke="#777" stroke-width="2"/>
+  <rect x="205" y="101" width="70" height="18" rx="3" fill="#333"/>
+  <rect x="262" y="101" width="8" height="18" fill="#DDD"/>
+  <circle cx="180" cy="110" r="4" fill="#555"/><circle cx="300" cy="110" r="4" fill="#555"/>
+  <text x="240" y="96" class="t" text-anchor="middle" font-weight="bold">D1</text>
+
+  <!-- U2 TSR 1-2450 (10..12, 2) -->
+  <rect x="318" y="72" width="84" height="32" rx="2" fill="#2E3236" opacity=".9"/>
+  <text x="360" y="86" fill="#FFFFFF" text-anchor="middle" font-size="11" font-weight="bold">U2 TSR</text>
+  <text x="360" y="99" fill="#FFFFFF" text-anchor="middle" font-size="10">IN · GND · OUT</text>
+  <circle cx="330" cy="110" r="4" fill="#555"/><circle cx="360" cy="110" r="4" fill="#555"/><circle cx="390" cy="110" r="4" fill="#555"/>
+
+  <!-- C1 (9,3)+ (9,4)- -->
+  <circle cx="300" cy="155" r="13" fill="#1F4E8C" opacity=".85"/>
+  <text x="300" y="159" fill="#FFFFFF" text-anchor="middle" font-size="10" font-weight="bold">C1</text>
+  <text x="318" y="146" class="t" font-size="12" font-weight="bold">+</text>
+
+  <!-- D2 SMBJ33A Unterseite (8,3)-(8,5), Kathode bei Zeile 3 -->
+  <rect x="261" y="140" width="18" height="60" fill="none" stroke="#C62828" stroke-width="2" stroke-dasharray="4 3"/>
+  <rect x="262" y="143" width="16" height="6" fill="#C62828" opacity=".6"/>
+  <text x="232" y="176" class="t" text-anchor="end" font-weight="bold">D2</text>
+  <text x="232" y="190" class="s" text-anchor="end">Unterseite</text>
+
+  <!-- C2 (12,3)+ (12,4)- -->
+  <circle cx="390" cy="155" r="13" fill="#1F4E8C" opacity=".85"/>
+  <text x="390" y="159" fill="#FFFFFF" text-anchor="middle" font-size="10" font-weight="bold">C2</text>
+  <text x="408" y="146" class="t" font-size="12" font-weight="bold">+</text>
+
+  <!-- D4 1N5819 stehend (23,1) Anode – (23,3) Kathode -->
+  <rect x="713" y="88" width="14" height="44" rx="3" fill="#333"/>
+  <rect x="713" y="122" width="14" height="6" fill="#DDD"/>
+  <circle cx="720" cy="80" r="4" fill="#555"/><circle cx="720" cy="140" r="4" fill="#555"/>
+  <text x="746" y="114" class="t" font-weight="bold">D4</text>
+
+  <!-- R2 1k 2W stehend (2,7)-(2,9) -->
+  <rect x="80" y="262" width="20" height="56" rx="6" fill="#B78850" stroke="#6B4A1F"/>
+  <circle cx="90" cy="260" r="4" fill="#555"/><circle cx="90" cy="320" r="4" fill="#555"/>
+  <text x="104" y="282" class="t" font-weight="bold">R2</text>
+
+  <!-- R1 3.3k (3,8)-(7,8) -->
+  <line x1="120" y1="290" x2="240" y2="290" stroke="#777" stroke-width="2"/>
+  <rect x="148" y="282" width="64" height="16" rx="6" fill="#7EB6E6" stroke="#2B5D8A"/>
+  <circle cx="120" cy="290" r="4" fill="#555"/><circle cx="240" cy="290" r="4" fill="#555"/>
+  <text x="180" y="278" class="t" text-anchor="middle" font-weight="bold">R1</text>
+
+  <!-- D3 BAT41 stehend (7,9) Kathode – (7,11) Anode -->
+  <rect x="234" y="326" width="12" height="48" rx="3" fill="#C9CFD3" stroke="#555"/>
+  <rect x="234" y="327" width="12" height="6" fill="#333"/>
+  <circle cx="240" cy="320" r="4" fill="#555"/><circle cx="240" cy="380" r="4" fill="#555"/>
+  <text x="222" y="356" class="t" text-anchor="end" font-weight="bold">D3</text>
+
+  <!-- U1 CNY17-3 DIP-6: Pins links Spalte 8 (1,2,3), rechts Spalte 11 (6,5,4) -->
+  <rect x="262" y="276" width="106" height="88" rx="3" fill="#2E3236" opacity=".88"/>
+  <circle cx="276" cy="290" r="4" fill="#FFFFFF"/>
+  <text x="315" y="318" fill="#FFFFFF" text-anchor="middle" font-size="12" font-weight="bold">U1</text>
+  <text x="315" y="332" fill="#FFFFFF" text-anchor="middle" font-size="10">CNY17-3</text>
+  <g font-size="10" fill="#FFFFFF" text-anchor="middle">
+    <text x="286" y="294">1</text><text x="286" y="324">2</text><text x="286" y="354">3</text>
+    <text x="346" y="294">6</text><text x="346" y="324">5</text><text x="346" y="354">4</text>
+  </g>
+
+  <!-- XIAO nRF52840: Pins Spalte 15 und 21, Zeilen 3–9, USB oben -->
+  <rect x="446" y="116" width="248" height="268" rx="10" fill="#2E3236" fill-opacity=".18" stroke="#2E3236" stroke-width="2.5"/>
+  <rect x="540" y="104" width="60" height="22" rx="4" fill="#9AA3A8" stroke="#2E3236"/>
+  <text x="570" y="119" class="t" text-anchor="middle" font-size="10" font-weight="bold">USB-C</text>
+  <text x="570" y="246" class="t" text-anchor="middle" font-weight="bold">U3 XIAO nRF52840</text>
+  <text x="570" y="262" class="s" text-anchor="middle">Oberseite des Moduls, USB-C zur Platinenkante</text>
+  <text x="570" y="276" class="s" text-anchor="middle">auf Stiftleisten 2 × 7</text>
+  <g font-size="11" fill="#2E3236" font-weight="bold">
+    <text x="492" y="144">D0</text><text x="492" y="174">D1</text><text x="492" y="204">D2</text><text x="492" y="234">D3</text><text x="492" y="264">D4</text><text x="492" y="294">D5</text><text x="492" y="324">D6</text>
+  </g>
+  <g font-size="11" fill="#2E3236" font-weight="bold" text-anchor="end">
+    <text x="648" y="144">5V</text><text x="648" y="174">GND</text><text x="648" y="204">3V3</text><text x="648" y="234">D10</text><text x="648" y="264">D9</text><text x="648" y="294">D8</text><text x="648" y="324">D7</text>
+  </g>
+  <g fill="#2E3236">
+    <circle cx="480" cy="140" r="5"/><circle cx="480" cy="170" r="5"/><circle cx="480" cy="200" r="5"/><circle cx="480" cy="230" r="5"/><circle cx="480" cy="260" r="5"/><circle cx="480" cy="290" r="5"/><circle cx="480" cy="320" r="5"/>
+    <circle cx="660" cy="140" r="5"/><circle cx="660" cy="170" r="5"/><circle cx="660" cy="200" r="5"/><circle cx="660" cy="230" r="5"/><circle cx="660" cy="260" r="5"/><circle cx="660" cy="290" r="5"/><circle cx="660" cy="320" r="5"/>
+  </g>
+
+  <!-- Legende -->
+  <g transform="translate(770,70)">
+    <text x="0" y="0" class="h">Verbindungen (Unterseite)</text>
+    <line x1="0" y1="20" x2="30" y2="20" class="w vin"/><text x="38" y="24" class="t">VIN 8–30 V</text>
+    <line x1="0" y1="42" x2="30" y2="42" class="w v5"/><text x="38" y="46" class="t">+5 V</text>
+    <line x1="0" y1="64" x2="30" y2="64" class="w gnd"/><text x="38" y="68" class="t">GND</text>
+    <line x1="0" y1="86" x2="30" y2="86" class="w sig"/><text x="38" y="90" class="t">SIG (Impuls)</text>
+    <line x1="0" y1="108" x2="30" y2="108" class="w led"/><text x="38" y="112" class="t">LED_A (Optokoppler)</text>
+    <line x1="0" y1="130" x2="30" y2="130" class="w d10"/><text x="38" y="134" class="t">D10 (zum XIAO)</text>
+    <text x="0" y="166" class="s">Kurze Strecken: Lötbrücke zwischen</text>
+    <text x="0" y="180" class="s">Nachbarlöchern. Lange Strecken: isolierter</text>
+    <text x="0" y="194" class="s">Draht (Kupferlackdraht oder Litze 0.25 mm²).</text>
+    <text x="0" y="214" class="s">Hellgraue Ringe = Kathode (Diodenring).</text>
+    <text x="0" y="228" class="s">Gestrichelt = Bauteil auf der Unterseite.</text>
+    <text x="0" y="248" class="s">Unter dem XIAO auf der Oberseite</text>
+    <text x="0" y="262" class="s">keine Bauteile.</text>
+  </g>
+
+  <!-- Tabelle -->
+  <text x="20" y="440" class="h">Bauteile – Lochpositionen (Spalte, Zeile)</text>
+  <g class="t" font-size="12">
+    <text x="20" y="464">P1 VIN-Litze (1,2) · P2 GND-Litze (1,6) · P3 SIG-Litze (1,9)</text>
+    <text x="20" y="484">F1 PTC MF-R050: (2,2) und (4,2)</text>
+    <text x="20" y="504">D1 1N5819: Anode (5,2), Kathode/Ring (9,2)</text>
+    <text x="20" y="524">U2 TSR 1-2450 stehend: IN (10,2) · GND (11,2) · OUT (12,2) – Gehäuse zur oberen Platinenkante</text>
+    <text x="20" y="544">C1 10 µF/50 V: + (9,3), − (9,4)   ·   C2 22 µF/25 V: + (12,3), − (12,4)</text>
+    <text x="20" y="564">D2 SMBJ33A (SMD, Unterseite): Kathode/Strich auf Pad (8,3), Anode auf Pad (8,5)</text>
+    <text x="20" y="584">D4 1N5819 stehend: Anode (23,1), Kathode/Ring (23,3)</text>
+    <text x="20" y="604">R2 1 kΩ / 2 W stehend: (2,9) und (2,7) – mit 2–3 mm Abstand zur Platine</text>
+    <text x="20" y="624">R1 3.3 kΩ: (3,8) und (7,8)   ·   D3 BAT41 stehend: Kathode/Ring (7,9), Anode (7,11)</text>
+    <text x="20" y="644">U1 CNY17-3: Pin 1 (8,8) · Pin 2 (8,9) · Pin 3 (8,10) frei · Pin 6 (11,8) frei · Pin 5 (11,9) · Pin 4 (11,10) – Punkt/Kerbe bei Pin 1</text>
+    <text x="20" y="664">U3 XIAO nRF52840: linke Reihe Spalte 15 (D0–D6), rechte Reihe Spalte 21 (5V, GND, 3V3, D10, D9, D8, D7), Zeilen 3–9</text>
+  </g>
+
+  <text x="20" y="704" class="h">Drähte / Lötbrücken (Unterseite)</text>
+  <g class="t" font-size="12">
+    <text x="20" y="728">VIN: (1,2)–(2,2) · (4,2)–(5,2) · (9,2)–(10,2) · (9,2)–(9,3)–(8,3)</text>
+    <text x="20" y="748">+5V: (12,2)–(12,3) · (12,2)–(12,1)–(23,1) · D4-Kathode (23,3)–(22,3)–(21,3) = XIAO 5V</text>
+    <text x="20" y="768">GND: Zeile 6 von (1,6) bis (12,6) · (2,6)–(2,7) · (8,5)–(8,6) · (9,4)–(9,6) · (11,2)–(11,6) · (12,4)–(12,6) · (10,6)–(10,11)</text>
+    <text x="20" y="788">       Zeile 11 von (7,11) bis (23,11) · (23,11)–(23,4)–(21,4) = XIAO GND · (8,9)–(9,9)–(9,11) · (11,10)–(11,11)</text>
+    <text x="20" y="808">SIG: (1,9)–(2,9)–(3,9)–(3,8)   ·   LED_A: (7,8)–(8,8) · (7,8)–(7,9)</text>
+    <text x="20" y="828">D10: (11,9)–(12,9)–(12,10) · Zeile 10 bis (22,10) · (22,10)–(22,6)–(21,6) = XIAO D10</text>
+    <text x="20" y="850" class="s">Achtung: Benachbarte Löcher mit verschiedenen Netzen (z. B. U2-Pins, (22,3)/(23,4), (11,10)/(12,10)) dürfen keine Lötbrücke haben. Nach dem Löten mit dem Durchgangsprüfer kontrollieren.</text>
+  </g>
+</svg>
