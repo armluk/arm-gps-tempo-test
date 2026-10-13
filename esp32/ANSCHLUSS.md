@@ -2,6 +2,9 @@
 
 Arm Eggiwil AG · Güllefass-Rechner · Stand 13.10.2026
 
+> **Hinweis:** Dies ist die erste Variante mit fertigen Modulen und Schraubklemmen. Die aktuelle Variante
+> (eigene vergossene Platine mit Litzen, 8–30 V) steht in [PLATINE.md](PLATINE.md).
+
 ## Zweck
 
 Ein kleiner ESP32 zählt die Impulse des Durchflussmessers **KROHNE OPTIFLUX 1000**
