@@ -10,7 +10,7 @@
     .dot{fill:#2E3236}
   </style>
 
-  <text x="20" y="28" class="h">Durchfluss-Sender Güllefass – Platinenschema V4 (zur Kontrolle)</text>
+  <text x="20" y="28" class="h">Durchfluss-Sender Güllefass – Platinenschema V5 mit XIAO ESP32-C3 (zur Kontrolle)</text>
   <text x="20" y="46" class="sm">Arm Eggiwil AG · 13.10.2026 · Entwurf, nicht geprüft</text>
 
   <!-- ================= Sensor-Seite ================= -->
@@ -68,7 +68,7 @@
   <text x="530" y="572" class="sm">Litze GND</text>
 
   <!-- ================= Platine ================= -->
-  <rect x="600" y="58" width="410" height="560" fill="#ECEFF1" fill-opacity="0.45" stroke="#2E3236" stroke-width="1.5" stroke-dasharray="8 5"/>
+  <rect x="600" y="58" width="510" height="560" fill="#ECEFF1" fill-opacity="0.45" stroke="#2E3236" stroke-width="1.5" stroke-dasharray="8 5"/>
   <text x="760" y="610" class="h">Trägerplatine (vergossen)</text>
 
   <!-- Lötpads links -->
@@ -190,29 +190,26 @@
   <line class="w" x1="606" y1="580" x2="1004" y2="580"/>
   <circle class="dot" cx="990" cy="580" r="4"/>
 
-  <!-- Lötpads rechts -->
-  <rect x="1004" y="94" width="12" height="12" fill="#FFF005" stroke="#2E3236"/>
-  <rect x="1004" y="314" width="12" height="12" fill="#FFF005" stroke="#2E3236"/>
-  <rect x="1004" y="574" width="12" height="12" fill="#FFF005" stroke="#2E3236"/>
-  <text x="1016" y="122" class="sm">P4</text>
-  <text x="1016" y="342" class="sm">P6</text>
-  <text x="1016" y="602" class="sm">P5</text>
+  <!-- D4 Schottky vor dem 5V-Pin des XIAO -->
+  <line class="w" x1="1004" y1="100" x2="1018" y2="100"/>
+  <polygon points="1018,90 1018,110 1038,100" fill="#2E3236"/>
+  <line class="w" x1="1039" y1="89" x2="1039" y2="111"/>
+  <line class="w" x1="1039" y1="100" x2="1050" y2="100"/>
+  <text x="1028" y="84" text-anchor="middle" class="lbl">D4</text>
+  <text x="1028" y="128" text-anchor="middle" class="sm">1N5819</text>
+  <line class="w" x1="1004" y1="320" x2="1050" y2="320"/>
+  <line class="w" x1="1004" y1="580" x2="1050" y2="580"/>
 
-  <!-- Grove zum ATOM -->
-  <line x1="1016" y1="100" x2="1046" y2="100" stroke="#C62828" stroke-width="3"/>
-  <line x1="1016" y1="320" x2="1046" y2="320" stroke="#C9A800" stroke-width="3"/>
-  <line x1="1016" y1="580" x2="1046" y2="580" stroke="#000000" stroke-width="3"/>
-  <text x="1018" y="92" class="sm">rot</text>
-  <text x="1018" y="312" class="sm">gelb</text>
-  <text x="1018" y="572" class="sm">schwarz</text>
-  <rect x="1046" y="70" width="60" height="540" fill="#2E3236"/>
-  <text x="1080" y="210" fill="#FFFFFF" font-weight="bold" text-anchor="middle" transform="rotate(-90 1080 210)">M5Stack ATOM Lite</text>
-  <text x="1080" y="450" fill="#FFFFFF" class="sm" text-anchor="middle" transform="rotate(-90 1080 450)" style="fill:#FFFFFF">Grove · G32 frei</text>
-  <text x="1060" y="104" fill="#FFFFFF" class="sm" style="fill:#FFFFFF">5V</text>
-  <text x="1054" y="324" style="fill:#FFFFFF" class="sm">G26</text>
-  <text x="1054" y="584" style="fill:#FFFFFF" class="sm">GND</text>
+  <!-- XIAO ESP32-C3, direkt aufgelötet -->
+  <rect x="1050" y="70" width="54" height="540" fill="none" stroke="#2E3236" stroke-width="2"/>
+  <rect x="1050" y="70" width="54" height="540" fill="#2E3236" fill-opacity="0.9"/>
+  <text x="1077" y="94" text-anchor="middle" class="sm" style="fill:#FFFFFF">5V</text>
+  <text x="1077" y="316" text-anchor="middle" class="sm" style="fill:#FFFFFF">D10</text>
+  <text x="1077" y="576" text-anchor="middle" class="sm" style="fill:#FFFFFF">GND</text>
+  <text x="1077" y="450" fill="#FFFFFF" font-weight="bold" text-anchor="middle" transform="rotate(-90 1077 450)" style="fill:#FFFFFF">Seeed XIAO ESP32-C3</text>
+  <text x="1077" y="200" fill="#FFFFFF" text-anchor="middle" class="sm" transform="rotate(-90 1077 200)" style="fill:#FFFFFF">aufgelötet</text>
 
   <!-- Legende -->
-  <text x="20" y="640" class="sm">Linien ohne Punkt, die sich kreuzen, sind nicht verbunden. Gestrichelt = Bauteil entfällt. Gelbe Quadrate = Lötpads für Litzen bzw. Grove-Adern.</text>
-  <text x="20" y="658" class="sm">Impuls «high» (D = +) → LED in U1 leuchtet → Transistor leitet → G26 = LOW. Interner Pull-up des ESP32 an G26, Software zählt fallende Flanken.</text>
+  <text x="20" y="640" class="sm">Linien ohne Punkt, die sich kreuzen, sind nicht verbunden. Gestrichelt = Bauteil entfällt. Gelbe Quadrate = Lötpads für Litzen.</text>
+  <text x="20" y="658" class="sm">Impuls «high» (D = +) → LED in U1 leuchtet → Transistor leitet → D10 = LOW. Interner Pull-up des ESP32-C3 an D10, Software zählt fallende Flanken.</text>
 </svg>

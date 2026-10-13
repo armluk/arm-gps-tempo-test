@@ -3,9 +3,10 @@
 // Zählt die Impulse des KROHNE OPTIFLUX 1000 (Impulsausgang 12 V DC, 1 Impuls = 1 Liter)
 // und sendet jede Sekunde den Durchfluss per Bluetooth Low Energy an die Karten-Seite.
 //
-// Hardware: ESP32 (M5Stack ATOM Lite oder ESP32 DevKitC), Impuls über Optokoppler an GPIO 26.
-// Software: Arduino IDE mit «esp32 by Espressif Systems» (Boardverwalter), Board z. B.
-//           «M5Stack-ATOM» bzw. «ESP32 Dev Module». Keine weiteren Bibliotheken nötig.
+// Hardware: Seeed XIAO ESP32-C3 auf der Trägerplatine (siehe PLATINE.md), Impuls über Optokoppler an D10 (GPIO10).
+//           D10 ist kein Strapping-Pin und hat beim Start keine Sonderfunktion.
+// Software: Arduino IDE mit «esp32 by Espressif Systems» (Boardverwalter), Board «XIAO_ESP32C3».
+//           Keine weiteren Bibliotheken nötig.
 //
 // Gesendeter Wert (Text): "<Liter pro Minute>;<Liter gesamt seit Einschalten>", z. B. "2950;18420"
 
@@ -14,7 +15,7 @@
 #include <BLE2902.h>
 
 // ---------- Einstellungen ----------
-const int      IMPULS_PIN       = 26;    // Optokoppler-Ausgang
+const int      IMPULS_PIN       = 10;    // Optokoppler-Ausgang an XIAO-Pin D10 (= GPIO10)
 const float    LITER_PRO_IMPULS = 1.0;   // am Messumformer eingestellt: 1 Impuls = 1 Liter
 const uint32_t ENTPRELL_US      = 2000;  // Impulse kürzer als 2 ms Abstand ignorieren (max. 500 l/s)
 const uint32_t FENSTER_MS       = 3000;  // Durchfluss = Mittelwert über die letzten 3 Sekunden
@@ -37,10 +38,7 @@ void IRAM_ATTR beiImpuls() {
 }
 
 uint32_t leseImpulse() {
-  noInterrupts();
-  uint32_t n = impulse;
-  interrupts();
-  return n;
+  return impulse;  // 32-Bit-Lesen ist auf dem ESP32-C3 atomar
 }
 
 // ---------- Bluetooth ----------

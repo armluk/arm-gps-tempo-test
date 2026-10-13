@@ -1,21 +1,20 @@
-# Trägerplatine für M5Stack ATOM Lite – Durchfluss-Sender Güllefass
+# Trägerplatine mit Seeed XIAO ESP32-C3 – Durchfluss-Sender Güllefass
 
-Arm Eggiwil AG · Entwurf V2, 13.10.2026 · Stand: Konzept, noch nicht gefertigt/geprüft
+Arm Eggiwil AG · Entwurf V5, 13.10.2026 · Stand: Konzept, noch nicht gefertigt/geprüft
+
+Schema zur Kontrolle: [platine-schema.svg](platine-schema.svg)
 
 ## Anforderungen
 
-- **Anschluss mit angelöteten Kabellitzen**, Platine wird **vergossen/versiegelt** und mit **Schrumpfschlauch** eingepackt
-  (keine Schraubklemmen, keine Stecker nach aussen).
-- Drei Anschlüsse nach aussen:
+- **Anschluss mit angelöteten Kabellitzen**, Platine wird **vergossen/versiegelt** und mit **Schrumpfschlauch** eingepackt.
+- Drei Litzen nach aussen:
   1. **VIN** – Versorgung **8 … 30 V DC**
   2. **GND** – Masse (gemeinsam für Versorgung und Signal)
-  3. **SIG** – Impulssignal vom Klemme **D** des KROHNE OPTIFLUX 1000 (1 Impuls = 1 Liter).
-     **D–** liegt auf +. Der **1-kΩ-Pulldown von D nach GND sitzt auf der Platine (R2)** – parallel zum Signal,
-     nicht in Serie. Am Sensor muss kein Widerstand mehr angeschlossen werden.
-
-Schema zur Kontrolle: [platine-schema.svg](platine-schema.svg)
-- Der ATOM Lite wird über ein **gekürztes Grove-Kabel (HY2.0-4P)** angelötet und bekommt darüber 5 V und das
-  Signal auf **G26** – dem Pin, den `durchfluss_ble.ino` bereits verwendet.
+  3. **SIG** – Impuls von Klemme **D** des KROHNE OPTIFLUX 1000 (1 Impuls = 1 Liter).
+     **D–** liegt auf +. Der **1-kΩ-Pulldown von D nach GND sitzt auf der Platine (R2)** – parallel, nicht in Serie.
+     Am Sensor muss kein Widerstand mehr angeschlossen werden.
+- **Seeed XIAO ESP32-C3** (Bluetooth LE) wird **direkt auf die Platine gelötet** (Randkontakte). Kein Kabel, kein Stecker.
+  Impuls auf **D10 (GPIO10)** – kein Strapping-Pin, keine Sonderfunktion beim Start.
 
 ## Schaltplan
 
@@ -23,24 +22,27 @@ Schema zur Kontrolle: [platine-schema.svg](platine-schema.svg)
  Litze VIN (8–30 V) ──F1──►|D1──┬──────┬───────────────┐
                                 │      │        ┌──────┴───────┐
                                D2     C1        │ U2 TSR 1-2450│
-                              TVS   10µ/50V     │ VIN  GND VOUT│── +5V ──┬── C2 22µ/10V ──┐
-                                │      │        └──────┬───────┘         │                │
- Litze GND ─────────────────────┴──────┴───────────────┴──────── GND ────┼────────────────┴──┐
-                                                                         │                   │
-                                                                   Grove rot (5V)      Grove schwarz (GND)
+                              TVS   10µ/50V     │ VIN  GND VOUT│── +5V ──┬── C2 22µ/10V
+                                │      │        └──────┬───────┘         │
+ Litze GND ─────────────────────┴──────┴───────────────┴──────── GND     D4 1N5819 (Anode +5V, Kathode XIAO 5V)
+                                                                         │
+                                                                   XIAO Pin «5V»
+
  Litze SIG ──┬─────────── R1 3.3k ──┬──► U1 PC817 Pin 1 (Anode)
              │                      D3 1N4148 (Kathode an Pin 1, Anode an Pin 2)
              R2 1k / 2 W            │
              (Pulldown)  GND ───────┴──► U1 Pin 2 (Kathode)
              │
-            GND
-                                         U1 Pin 4 (Kollektor) ──► Grove gelb (G26)
-                                         U1 Pin 3 (Emitter)   ──► GND
+            GND                          U1 Pin 4 (Kollektor) ──► XIAO Pin «D10»
+                                         U1 Pin 3 (Emitter)   ──► GND = XIAO Pin «GND»
 ```
 
-Funktion: Impuls «high» (8–30 V) → LED im Optokoppler leuchtet → Transistor leitet → G26 wird LOW.
-Der ESP32 nutzt den internen Pull-up an G26 und zählt fallende Flanken (wie in der Software umgesetzt).
-Der Optokoppler schützt den ESP32 (3.3 V) vor dem 8–30-V-Signal.
+Funktion: Impuls «high» (8–30 V) → LED im Optokoppler leuchtet → Transistor leitet → D10 wird LOW.
+Interner Pull-up an D10, die Software zählt fallende Flanken.
+
+**D4** ist nötig, weil der 5V-Pin des XIAO direkt mit der USB-Buchse verbunden ist. Laut Seeed-Wiki darf man dort
+nur über eine Diode einspeisen – sonst würde beim Programmieren per USB Strom in den TSR zurückfliessen.
+Am 5V-Pin liegen danach ca. 4.6 V; der XIAO macht daraus selbst 3.3 V.
 
 ## Netzliste (Verbindungen)
 
@@ -49,60 +51,54 @@ Der Optokoppler schützt den ESP32 (3.3 V) vor dem 8–30-V-Signal.
 | **VIN_RAW** | Lötpad P1 (Litze VIN) · F1 Pin 1 |
 | **VIN_F** | F1 Pin 2 · D1 Anode |
 | **VIN** | D1 Kathode · D2 Kathode · C1 + · U2 Pin 1 (VIN) |
-| **GND** | Lötpad P2 (Litze GND) · D2 Anode · C1 − · U2 Pin 2 (GND) · C2 − · R2 Pin 2 · U1 Pin 2 · D3 Anode · U1 Pin 3 · Lötpad P5 (Grove schwarz) |
-| **+5V** | U2 Pin 3 (VOUT) · C2 + · Lötpad P4 (Grove rot) |
+| **GND** | Lötpad P2 (Litze GND) · D2 Anode · C1 − · U2 Pin 2 (GND) · C2 − · R2 Pin 2 · U1 Pin 2 · D3 Anode · U1 Pin 3 · XIAO «GND» |
+| **+5V** | U2 Pin 3 (VOUT) · C2 + · D4 Anode |
+| **5V_XIAO** | D4 Kathode · XIAO «5V» |
 | **SIG** | Lötpad P3 (Litze SIG) · R2 Pin 1 · R1 Pin 1 |
 | **LED_A** | R1 Pin 2 · U1 Pin 1 · D3 Kathode |
-| **G26** | U1 Pin 4 · Lötpad P6 (Grove gelb) |
+| **D10** | U1 Pin 4 · XIAO «D10» |
 
-Grove-Ader Weiss (G32) wird nicht verwendet – kurz abschneiden und isolieren.
+Übrige XIAO-Pins (D0–D9, 3V3) bleiben frei – Pads trotzdem mitlöten (mechanischer Halt).
 
-## Stückliste (alles Durchsteck-Bauteile)
+## Stückliste
 
 | Ref | Bauteil | Wert / Typ | Bemerkung |
 |---|---|---|---|
 | P1–P3 | Lötpads mit Zugentlastungsbohrung | für Litze 0.5–0.75 mm² | VIN, GND, SIG |
-| P4–P6 | Lötpads | für Grove-Adern | 5V, GND, G26 |
 | F1 | PTC-Sicherung, radial | 0.5 A Haltestrom, ≥ 60 V | rückstellend |
 | D1 | Schottky-Diode | 1N5819 (40 V, 1 A) | Verpolschutz |
-| D2 | TVS-Diode | P6KE36A | begrenzt Spannungsspitzen; liegt über 30 V, damit sie im Normalbetrieb nicht leitet |
+| D2 | TVS-Diode | P6KE36A | begrenzt Spannungsspitzen; leitet erst über 30 V |
 | C1 | Elko | 10 µF / 50 V, radial | |
-| U2 | Schaltregler-Modul | **TRACO TSR 1-2450** (6.5–36 V ein, 5 V / 1 A aus) | deckt 8–30 V mit Reserve ab |
+| U2 | Schaltregler-Modul | **TRACO TSR 1-2450** (6.5–36 V ein, 5 V / 1 A aus) | |
 | C2 | Elko | 22 µF / 10 V, radial | |
+| D4 | Schottky-Diode | 1N5819 | Rückspeiseschutz zum USB-Port des XIAO |
 | R1 | Widerstand | 3.3 kΩ, 0.5 W | LED-Strom ≈ 2 mA bei 8 V, ≈ 9 mA bei 30 V |
 | R2 | Widerstand | **1 kΩ, 2 W** | Pulldown SIG → GND (ersetzt den Widerstand am Sensor) |
 | D3 | Diode | 1N4148 | schützt die Optokoppler-LED |
 | U1 | Optokoppler | PC817, DIP-4 | |
-| – | M5Stack ATOM Lite + Grove-Kabel | | Kabel auf ca. 5 cm kürzen, Adern verzinnen |
+| U3 | **Seeed XIAO ESP32-C3** | mit Antenne | flach aufgelötet (Randkontakte), USB-C zur Platinenkante |
 
 ## Wichtige Hinweise
 
-- **R2 wird warm:** Solange der Impuls ansteht, fliessen bei 12 V 12 mA (≈ 0.14 W), bei 24 V 24 mA (≈ 0.6 W),
-  bei 30 V 30 mA (≈ 0.9 W). Deshalb **2 W**, mit etwas Abstand zur Platine montieren, damit die Wärme in die
-  Vergussmasse abgegeben wird. Zusammen mit R1 belastet die Platine den Impulsausgang mit bis zu ca. 40 mA bei 30 V –
-  gleich viel wie bisher plus wenige mA.
-- **Wichtig für das bestehende Gerät:** Wird der Widerstand am Sensor entfernt, hängt dessen Pulldown jetzt an der
-  Platine. Ist die Platine einmal abgeklemmt, fehlt der Pulldown auch dem bestehenden Gerät – dann den Widerstand
-  am Sensor wieder einsetzen oder die Platine angeschlossen lassen. **Nicht beide gleichzeitig** (sonst 500 Ω,
-  doppelte Belastung).
-- **Spannungsspitzen:** Der TSR 1-2450 ist bis 36 V angegeben. D2 begrenzt grössere Spitzen, kann sie bei sehr
-  energiereichen Störungen aber nicht ganz unter 36 V halten. Für ein Traktor-Bordnetz ist das in der Regel
-  ausreichend; eine Garantie ist es nicht.
-- **Grove-Farben:** Laut M5Stack-Doku ist die Reihenfolge GND · 5V · G26 · G32 = schwarz · rot · gelb · weiss.
-  **Vor dem Anlöten mit dem Durchgangsprüfer bestätigen**, welche Ader an welchem Pin der Buchse liegt.
+- **Antenne:** Der XIAO ESP32-C3 wird mit einer kleinen Klebe-/Flex-Antenne geliefert (U.FL-Stecker). Antenne
+  anstecken und **mit vergiessen**, nicht über Metall oder die Massefläche legen. Bluetooth funkt durch Vergussmasse
+  und Schrumpfschlauch, nicht durch Metall.
+- **R2 wird warm:** Solange der Impuls ansteht, bei 12 V ≈ 0.14 W, bei 24 V ≈ 0.6 W, bei 30 V ≈ 0.9 W → **2 W**,
+  mit 2–3 mm Abstand zur Platine montieren.
+- **Bestehendes Gerät:** Der Widerstand am Sensor entfällt, R2 übernimmt. Ist die Platine abgeklemmt, fehlt der
+  Pulldown auch dem bestehenden Gerät. **Nicht beide gleichzeitig** anschliessen (sonst 500 Ω).
+- **Spannungsspitzen:** TSR 1-2450 bis 36 V angegeben; D2 begrenzt grössere Spitzen, aber nicht garantiert unter 36 V.
+- **Pin-Belegung XIAO:** Lage von 5V, GND und D10 am Modul vor dem Layout im Seeed-Pinout prüfen.
 - **Vor dem Vergiessen:**
-  1. Software auf den ATOM Lite laden (per USB-C) und mit Signal testen – nach dem Einpacken ist USB nicht mehr zugänglich.
+  1. Software per USB-C aufspielen (Board «XIAO_ESP32C3») und mit Signal testen.
   2. Funktion am Fass prüfen (Durchfluss in der Karten-App sichtbar).
-- **Versiegeln:** Platine mit weichbleibender Vergussmasse (Silikon oder Polyurethan) vergiessen, nicht mit
-  hartem Epoxid direkt auf Bauteilen (Spannungsrisse bei Kälte/Wärme). Danach **Schrumpfschlauch mit Innenkleber**
-  (dual wall) über Platine und Litzenaustritte. Der ATOM Lite kann mit eingeschrumpft werden – Bluetooth funkt durch
-  Schrumpfschlauch und Vergussmasse; nicht in Metall einpacken.
+  3. Die USB-C-Buchse an die Platinenkante legen. Wer später neue Software aufspielen will, lässt die Buchse frei
+     (mit Gummikappe), sonst wird sie mit vergossen.
+- **Versiegeln:** weichbleibende Vergussmasse (Silikon oder Polyurethan), kein hartes Epoxid; danach
+  **Schrumpfschlauch mit Innenkleber** über Platine und Litzenaustritte.
 
 ## Platine
 
-Grösse ca. **35 × 22 mm**, 2 Lagen, alle Bauteile auf einer Seite, Lötpads an den Schmalseiten:
-links **VIN · GND · SIG** (Litzen zum Fass), rechts **5V · GND · G26** (Grove zum ATOM).
-Masse als Fläche auf der Unterseite. Zeichnen in KiCad oder EasyEDA, fertigen z. B. bei JLCPCB, Aisler oder PCBWay.
-
-Alternative ohne Platinenbestellung: Aufbau auf einer kleinen **Lochrasterplatine** – da ohnehin vergossen wird,
-ist das für ein Einzelstück gleichwertig.
+Grösse ca. **45 × 25 mm**, 2 Lagen, alle Bauteile oben. Litzen-Pads an einer Schmalseite (VIN · GND · SIG),
+XIAO an der gegenüberliegenden Seite mit USB-C zur Kante. Massefläche unten – **nicht unter der Antenne**.
+Zeichnen in KiCad oder EasyEDA, fertigen z. B. bei JLCPCB, Aisler oder PCBWay.
