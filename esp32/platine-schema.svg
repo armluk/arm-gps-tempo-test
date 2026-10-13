@@ -10,7 +10,7 @@
     .dot{fill:#2E3236}
   </style>
 
-  <text x="20" y="28" class="h">Durchfluss-Sender Güllefass – Platinenschema V5 mit XIAO ESP32-C3 (zur Kontrolle)</text>
+  <text x="20" y="28" class="h">Durchfluss-Sender Güllefass – Platinenschema V6 mit XIAO nRF52840 (zur Kontrolle)</text>
   <text x="20" y="46" class="sm">Arm Eggiwil AG · 13.10.2026 · Entwurf, nicht geprüft</text>
 
   <!-- ================= Sensor-Seite ================= -->
@@ -98,7 +98,7 @@
   <line class="w" x1="759" y1="140" x2="781" y2="140"/>
   <line class="w" x1="770" y1="160" x2="770" y2="220"/>
   <text x="742" y="176" class="lbl">D2</text>
-  <text x="712" y="192" class="sm">P6KE36A</text>
+  <text x="712" y="192" class="sm">SMBJ33A</text>
   <!-- C1 -->
   <circle class="dot" cx="820" cy="100" r="4"/>
   <line class="w" x1="820" y1="100" x2="820" y2="146"/>
@@ -156,7 +156,7 @@
   <polygon points="724,365 746,365 735,345" fill="#2E3236"/>
   <line class="w" x1="735" y1="365" x2="735" y2="400"/>
   <text x="702" y="362" class="lbl">D3</text>
-  <text x="742" y="384" class="sm">1N4148</text>
+  <text x="742" y="384" class="sm">BAT41</text>
   <circle class="dot" cx="735" cy="400" r="4"/>
   <line class="w" x1="735" y1="400" x2="800" y2="400"/>
   <line class="w" x1="735" y1="400" x2="735" y2="580"/>
@@ -164,11 +164,11 @@
 
   <!-- U1 PC817 -->
   <rect class="box" x="800" y="290" width="120" height="140"/>
-  <text x="860" y="448" text-anchor="middle" class="lbl">U1 PC817</text>
+  <text x="860" y="448" text-anchor="middle" class="lbl">U1 CNY17-3</text>
   <text x="806" y="314" class="sm">1</text>
   <text x="806" y="414" class="sm">2</text>
-  <text x="906" y="314" class="sm">4</text>
-  <text x="906" y="414" class="sm">3</text>
+  <text x="906" y="314" class="sm">5</text>
+  <text x="906" y="414" class="sm">4</text>
   <!-- LED -->
   <polyline class="w" points="800,320 830,320 830,345"/>
   <polygon points="819,345 841,345 830,365" fill="#2E3236"/>
@@ -206,10 +206,10 @@
   <text x="1077" y="94" text-anchor="middle" class="sm" style="fill:#FFFFFF">5V</text>
   <text x="1077" y="316" text-anchor="middle" class="sm" style="fill:#FFFFFF">D10</text>
   <text x="1077" y="576" text-anchor="middle" class="sm" style="fill:#FFFFFF">GND</text>
-  <text x="1077" y="450" fill="#FFFFFF" font-weight="bold" text-anchor="middle" transform="rotate(-90 1077 450)" style="fill:#FFFFFF">Seeed XIAO ESP32-C3</text>
+  <text x="1077" y="450" fill="#FFFFFF" font-weight="bold" text-anchor="middle" transform="rotate(-90 1077 450)" style="fill:#FFFFFF">Seeed XIAO nRF52840</text>
   <text x="1077" y="200" fill="#FFFFFF" text-anchor="middle" class="sm" transform="rotate(-90 1077 200)" style="fill:#FFFFFF">aufgelötet</text>
 
   <!-- Legende -->
   <text x="20" y="640" class="sm">Linien ohne Punkt, die sich kreuzen, sind nicht verbunden. Gestrichelt = Bauteil entfällt. Gelbe Quadrate = Lötpads für Litzen.</text>
-  <text x="20" y="658" class="sm">Impuls «high» (D = +) → LED in U1 leuchtet → Transistor leitet → D10 = LOW. Interner Pull-up des ESP32-C3 an D10, Software zählt fallende Flanken.</text>
+  <text x="20" y="658" class="sm">Impuls «high» (D = +) → LED in U1 leuchtet → Transistor leitet → D10 = LOW. Interner Pull-up des nRF52840 an D10, Software zählt fallende Flanken.</text>
 </svg>
