@@ -15,19 +15,19 @@ Viele Kleinteile gibt es nur in Packungen – die Packung reicht dann für mehre
 | 3 | U1 | 1 | Optokoppler Vishay **CNY17-3**, DIP-6 | **175-20-642** | CNY17-3 | CHF 0.26 / Stk. | ersetzt PC817 (nicht erhältlich), **andere Pinbelegung**, siehe unten |
 | 4 | D1, D4 | 2 | Schottky-Diode **1N5819**, 40 V / 1 A, DO-41 | **304-42-973** | 1N5819 (Taiwan Semiconductor) | CHF 13.33 / 100 Stk. | |
 | 5 | D2 | 1 | TVS-Diode **SMBJ33A**, 33 V, 600 W, **SMD (DO-214AA/SMB)** | **304-45-455** | SMBJ33A (Littelfuse) | CHF 4.83 / 25 Stk. | ersetzt P6KE36A (nicht erhältlich); grosses SMD-Gehäuse, von Hand lötbar |
-| 6 | D3 | 1 | Schottky-Diode **BAT41**, 100 V, DO-35 | **170-12-019** | BAT41 (ST) | CHF 0.025 / Stk. | ersetzt 1N4148 (nicht mehr im Sortiment) |
+| 6 | D3 | 1 | Schottky-Diode **BAT41**, 100 V, DO-35 | **170-12-019** | BAT41 (ST) | CHF 0.63 für 25 Stk. (Mindestmenge 25) | ersetzt 1N4148 (nicht mehr im Sortiment) |
 | 7 | F1 | 1 | Rückstellende Sicherung Bourns **MF-R050**, radial, 60 V, Haltestrom 0.5 A | **304-42-380** | MF-R050 | CHF 3.11 / 10 Stk. | Distrelec nennt «1 A» = Auslösestrom |
 | 8 | R1 | 1 | Widerstand **3.3 kΩ**, 0.6 W, 1 %, axial 0207 | **304-43-123** | MBB02070C3301FCT00 (Vishay) | CHF 3.28 / 50 Stk. | |
-| 9 | R2 | 1 | Widerstand **1 kΩ, 2 W**, Kohleschicht, axial | **304-98-687** | 7078861 (RS PRO) | CHF 2.19 | Pulldown; Packungsgrösse auf der Produktseite prüfen |
-| 10 | C1 | 1 | Elko radial **10 µF / 50 V**, 105 °C | **167-25-806** | ECA1HHG100I (Panasonic) | – | Preis auf der Produktseite prüfen |
-| 11 | C2 | 1 | Elko radial **22 µF / 25 V** | **304-42-838** | EEAFC1E220 (Panasonic) | CHF 1.77 | Packungsgrösse prüfen |
+| 9 | R2 | 1 | Widerstand **1 kΩ, 2 W**, Kohleschicht, axial | **304-98-687** | 7078861 (RS PRO) | CHF 2.19 / 10 Stk. | Pulldown |
+| 10 | C1 | 1 | Elko radial **10 µF / 50 V**, 105 °C | **167-25-806** | ECA1HHG100I (Panasonic) | CHF 3.60 für 50 Stk. (Mindestmenge 50) | |
+| 11 | C2 | 1 | Elko radial **22 µF / 25 V** | **304-42-838** | EEAFC1E220 (Panasonic) | CHF 1.77 | |
 | 12 | – | 1 | Leiterplatte ca. 45 × 25 mm oder Lochraster | – | – | – | Platine z. B. bei JLCPCB/Aisler, oder Lochraster aus dem Sortiment |
 
 ## B. Verpackung
 
 | Pos | Menge | Teil | Distrelec Art.-Nr. | Hersteller-Nr. | Preis | Hinweis |
 |---|---|---|---|---|---|---|
-| 13 | 1 | Silikon-Vergussmasse 2K, transparent, 250 g, 1:1 | **304-87-040** | ACC Silicones QSIL 216 | – | weichbleibend, −60 … +204 °C |
+| 13 | 1 | Silikon-Vergussmasse 2K, transparent, 250 g, 1:1 | 304-87-040 | ACC Silicones QSIL 216 | **CHF 114.50** | teuer – **nicht in der Bestell-CSV**; günstigere Vergussmasse separat wählen |
 | 14 | 1 | Schrumpfschlauch 3:1, 24 → 8 mm, schwarz, 1.2 m | **305-08-226** | TE RNF 3000-24/8-0 | CHF 14.91 | **vor Bestellung prüfen, ob mit Innenkleber**; sonst Platine vor dem Schrumpfen ganz vergiessen |
 | 15 | 1 | Kleine Schrumpfschläuche Ø 3–6 mm | – | – | – | Einzeladern |
 | 16 | 1 | Kabelbinder / Kunststoff-Abstandshalter | – | – | – | Modul **mind. 2 cm von Metall** |
@@ -57,5 +57,9 @@ Viele Kleinteile gibt es nur in Packungen – die Packung reicht dann für mehre
 
 ## Ungefähre Kosten Elektronik
 
-Für ein Modul ca. **CHF 45–55** inkl. der angebrochenen Packungen (ohne Platine, Vergussmasse und Kabel),
+Warenkorb-Test am 13.10.2026: Positionen 1–11 zusammen **CHF 45.76** exkl. MwSt, Versand CHF 8.00 (ohne Platine, Vergussmasse und Kabel),
 für jedes weitere Modul deutlich weniger (Packungen reichen für viele Module).
+
+## Bestell-Datei
+
+[distrelec-stueckliste.csv](distrelec-stueckliste.csv) – Artikelnummer, Menge, Referenz (Semikolon-getrennt) für den Upload im Distrelec-Warenkorb unter «Stückliste».
