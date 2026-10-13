@@ -51,6 +51,11 @@ details[open] summary::after{content:"–"}
 .set-head{display:flex;justify-content:space-between;align-items:baseline}
 .set-head label{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--on-dark)}
 .set-head output{font-size:22px;font-weight:900}
+.set-head .lbl{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--on-dark)}
+.set-row[hidden]{display:none}
+.seg{display:flex;gap:2px;background:#fff;border:2px solid #fff}
+.seg button{flex:1;min-height:44px;border:0;background:var(--dark);color:#fff;font:700 12px/1.2 Archivo,'Segoe UI',system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--yellow);color:var(--dark)}
 .ctrl{display:flex;align-items:center;gap:10px}
 .step{width:44px;height:44px;flex:none;border:0;background:#000;color:#fff;font:900 22px/1 Archivo,sans-serif;cursor:pointer}
 .step:active{background:var(--yellow);color:var(--dark)}
@@ -96,8 +101,25 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <div class="ctrl"><button class="step" type="button" data-k="width" data-d="-1" aria-label="Arbeitsbreite um 0.25 m verringern">−</button><input id="width" type="range" min="5" max="30" step="0.25" value="12"><button class="step" type="button" data-k="width" data-d="1" aria-label="Arbeitsbreite um 0.25 m erhöhen">+</button></div>
 </div>
 <div class="set-row">
-<div class="set-head"><label for="offset">Abstand Traktor–Balken</label><output id="offsetOut">3.0 m</output></div>
+<div class="set-head"><span class="lbl" id="srcLbl">Position kommt von</span></div>
+<div class="seg" role="group" aria-labelledby="srcLbl">
+<button type="button" id="srcPhone" aria-pressed="true">Handy im Traktor</button>
+<button type="button" id="srcAnt" aria-pressed="false">Antenne</button>
+</div>
+</div>
+<div class="set-row" id="rowPhone">
+<div class="set-head"><label for="offset">Abstand Traktor–Verteiler</label><output id="offsetOut">3.0 m</output></div>
 <div class="ctrl"><button class="step" type="button" data-k="offset" data-d="-1" aria-label="Abstand um 0.5 m verringern">−</button><input id="offset" type="range" min="0" max="15" step="0.5" value="3"><button class="step" type="button" data-k="offset" data-d="1" aria-label="Abstand um 0.5 m erhöhen">+</button></div>
+</div>
+<div class="set-row" id="rowAnt" hidden>
+<div class="set-head"><label for="aOffset">Antenne → Verteiler (Fahrtrichtung)</label><output id="aOffsetOut">0.00 m</output></div>
+<div class="ctrl"><button class="step" type="button" data-k="aOffset" data-d="-1" aria-label="Abstand Antenne um 5 cm verringern">−</button><input id="aOffset" type="range" min="-5" max="15" step="0.05" value="0"><button class="step" type="button" data-k="aOffset" data-d="1" aria-label="Abstand Antenne um 5 cm erhöhen">+</button></div>
+<p class="note">0 = Antenne genau über dem Verteiler. Positiv = Verteiler liegt hinter der Antenne, negativ = davor.</p>
+</div>
+<div class="set-row" id="rowSide" hidden>
+<div class="set-head"><label for="aSide">Antenne seitlich versetzt</label><output id="aSideOut">0.00 m</output></div>
+<div class="ctrl"><button class="step" type="button" data-k="aSide" data-d="-1" aria-label="Seitlichen Versatz um 5 cm nach links">−</button><input id="aSide" type="range" min="-5" max="5" step="0.05" value="0"><button class="step" type="button" data-k="aSide" data-d="1" aria-label="Seitlichen Versatz um 5 cm nach rechts">+</button></div>
+<p class="note">Gemessen von der Verteiler-Mitte. Positiv = Antenne rechts der Mitte (in Fahrtrichtung), negativ = links.</p>
 </div>
 <div class="set-row">
 <div class="set-head"><label for="rate">Ausbringmenge</label><output id="rateOut">25 m³/ha</output></div>
@@ -150,9 +172,16 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   var coverStyle = { stroke: false, fillColor: '#FFF005', fillOpacity: 0.45, interactive: false };
 
   // ---------- Zustand ----------
-  var cfg = { width: 12, offset: 3, rate: 25 };
-  var steps = { width: 0.25, offset: 0.5, rate: 1 };
-  var fmtCfg = { width: function (v) { return v.toFixed(2) + ' m'; }, offset: function (v) { return v.toFixed(1) + ' m'; }, rate: function (v) { return v.toFixed(0) + ' m³/ha'; } };
+  var cfg = { width: 12, offset: 3, rate: 25, source: 'phone', aOffset: 0, aSide: 0 };
+  var KEYS = ['width', 'offset', 'rate', 'aOffset', 'aSide'];
+  var steps = { width: 0.25, offset: 0.5, rate: 1, aOffset: 0.05, aSide: 0.05 };
+  var fmtCfg = {
+    width: function (v) { return v.toFixed(2) + ' m'; },
+    offset: function (v) { return v.toFixed(1) + ' m'; },
+    rate: function (v) { return v.toFixed(0) + ' m³/ha'; },
+    aOffset: function (v) { return v.toFixed(2) + ' m'; },
+    aSide: function (v) { return v === 0 ? '0.00 m' : Math.abs(v).toFixed(2) + ' m ' + (v > 0 ? 'rechts' : 'links'); }
+  };
   var rec = null, saved = null, watchId = null, demoTimer = null, wakeLock = null, follow = true, lastLL = null, samples = [], clockTimer = null;
 
   function newRec() {
@@ -214,10 +243,21 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     cfg[k] = Number(v.toFixed(2));
     el.value = cfg[k];
     $(k + 'Out').textContent = fmtCfg[k](cfg[k]);
-    try { localStorage.setItem(STORE + '-cfg', JSON.stringify(cfg)); } catch (e) {}
+    saveCfg();
     render();
   }
-  ['width', 'offset', 'rate'].forEach(function (k) { $(k).addEventListener('input', function (e) { setCfg(k, parseFloat(e.target.value)); }); });
+  function saveCfg() { try { localStorage.setItem(STORE + '-cfg', JSON.stringify(cfg)); } catch (e) {} }
+  function setSource(s) {
+    cfg.source = s === 'antenna' ? 'antenna' : 'phone';
+    var ant = cfg.source === 'antenna';
+    $('srcPhone').setAttribute('aria-pressed', String(!ant));
+    $('srcAnt').setAttribute('aria-pressed', String(ant));
+    $('rowPhone').hidden = ant; $('rowAnt').hidden = !ant; $('rowSide').hidden = !ant;
+    saveCfg();
+  }
+  $('srcPhone').addEventListener('click', function () { setSource('phone'); });
+  $('srcAnt').addEventListener('click', function () { setSource('antenna'); });
+  KEYS.forEach(function (k) { $(k).addEventListener('input', function (e) { setCfg(k, parseFloat(e.target.value)); }); });
   Array.prototype.forEach.call(document.querySelectorAll('.step'), function (b) {
     b.addEventListener('click', function () { var k = b.getAttribute('data-k'); setCfg(k, cfg[k] + steps[k] * parseFloat(b.getAttribute('data-d'))); });
   });
@@ -229,13 +269,18 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     tractor.setLatLng(lastLL);
     if (follow) map.panTo(lastLL, { animate: false });
     if (kmh !== null) { samples.push({ v: kmh, t: t }); samples = samples.filter(function (s) { return t - s.t <= WINDOW_MS; }); }
-    if (acc !== null) $('status').innerHTML = '<span class="rec-dot"></span>' + (rec ? 'Aufzeichnung' : 'GPS') + ' · ±' + Math.round(acc) + ' m' + (acc > 20 ? ' (schwach)' : '');
+    if (acc !== null) {
+      var accTxt = acc < 1 ? '±' + Math.max(1, Math.round(acc * 100)) + ' cm' + (acc <= 0.1 ? ' · RTK' : '') : '±' + Math.round(acc) + ' m' + (acc > 20 ? ' (schwach)' : '');
+      $('status').innerHTML = '<span class="rec-dot"></span>' + (rec ? 'Aufzeichnung' : 'GPS') + ' · ' + accTxt;
+    }
     if (!rec) { render(); return; }
 
     if (!rec.origin) rec.origin = { lat: lat, lon: lon };
     var raw = toXY(rec.origin, lat, lon);
     // GPS-Zittern glätten (gleitender Mittelwert, springt bei grossen Sprüngen nach)
-    var p = rec.sp && dist(rec.sp, raw) < MAX_JUMP ? { x: rec.sp.x * 0.6 + raw.x * 0.4, y: rec.sp.y * 0.6 + raw.y * 0.4 } : raw;
+    // bei genauer Position (RTK, besser als ±0.5 m) nicht glätten
+    var precise = acc !== null && acc < 0.5;
+    var p = !precise && rec.sp && dist(rec.sp, raw) < MAX_JUMP ? { x: rec.sp.x * 0.6 + raw.x * 0.4, y: rec.sp.y * 0.6 + raw.y * 0.4 } : raw;
     rec.sp = p;
     rec.track.push([lat, lon]);
     trackLine.addLatLng(lastLL);
@@ -243,7 +288,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     // Fahrtrichtung: GPS-Kurs, sonst aus der Bewegung (mind. 2 m)
     var h = null;
     if (!rec.ref) rec.ref = p;
-    if (dist(p, rec.ref) >= 3) { rec.heading = Math.atan2(p.x - rec.ref.x, p.y - rec.ref.y); rec.ref = p; }
+    if (dist(p, rec.ref) >= (precise ? 1 : 3)) { rec.heading = Math.atan2(p.x - rec.ref.x, p.y - rec.ref.y); rec.ref = p; }
     if (headingDeg !== null && !isNaN(headingDeg) && kmh !== null && kmh > STAND) h = headingDeg * D;
     else if (rec.heading !== undefined) h = rec.heading;
 
@@ -251,7 +296,10 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (v === null || v <= STAND || h === null) { rec.prevBoom = null; boomLine.setLatLngs([]); render(); return; }
 
     var f = { x: Math.sin(h), y: Math.cos(h) }, r = { x: Math.cos(h), y: -Math.sin(h) };
-    var c = { x: p.x - cfg.offset * f.x, y: p.y - cfg.offset * f.y };
+    // Verteiler-Mitte: hinter dem Positionspunkt (Abstand) und bei der Antenne ggf. seitlich versetzt
+    var ant = cfg.source === 'antenna';
+    var back = ant ? cfg.aOffset : cfg.offset, side = ant ? cfg.aSide : 0;
+    var c = { x: p.x - back * f.x - side * r.x, y: p.y - back * f.y - side * r.y };
     var half = cfg.width / 2;
     var bl = { x: c.x - half * r.x, y: c.y - half * r.y }, br = { x: c.x + half * r.x, y: c.y + half * r.y };
     boomLine.setLatLngs([toLL(rec.origin, bl), toLL(rec.origin, br)]);
@@ -384,7 +432,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   }
   function fileBase(d) { return 'guelle-karte-' + d.date.slice(0, 16).replace(/[:T]/g, '-'); }
   function props(d) {
-    return { datum: d.date, flaeche_ha: Number(d.stats.area.toFixed(3)), menge_m3: Math.round(d.stats.area * (d.stats.rate || d.cfg.rate)), ueberlappung_prozent: Math.round(d.stats.overlap), arbeitsbreite_m: d.cfg.width, abstand_balken_m: d.cfg.offset, ausbringmenge_m3_ha: d.cfg.rate };
+    return { datum: d.date, flaeche_ha: Number(d.stats.area.toFixed(3)), menge_m3: Math.round(d.stats.area * (d.stats.rate || d.cfg.rate)), ueberlappung_prozent: Math.round(d.stats.overlap), arbeitsbreite_m: d.cfg.width, positionsquelle: d.cfg.source === 'antenna' ? 'Antenne' : 'Handy', abstand_verteiler_m: d.cfg.source === 'antenna' ? d.cfg.aOffset : d.cfg.offset, seitlicher_versatz_m: d.cfg.source === 'antenna' ? d.cfg.aSide : 0, ausbringmenge_m3_ha: d.cfg.rate };
   }
   $('dlGeo').addEventListener('click', function () {
     var d = current(); if (!d || !d.quads.length) { showMsg('Noch keine Fläche aufgezeichnet.'); return; }
@@ -409,7 +457,8 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 
   // ---------- Laden ----------
   try { var c0 = JSON.parse(localStorage.getItem(STORE + '-cfg')); if (c0) cfg = Object.assign(cfg, c0); } catch (e) {}
-  ['width', 'offset', 'rate'].forEach(function (k) { setCfg(k, cfg[k]); });
+  KEYS.forEach(function (k) { setCfg(k, cfg[k]); });
+  setSource(cfg.source);
   try {
     saved = JSON.parse(localStorage.getItem(STORE));
     if (saved && saved.quads && saved.quads.length) {
