@@ -27,14 +27,16 @@ nav.tabs a[aria-current]{color:#fff;border-bottom-color:var(--yellow)}
 .leaflet-bar a{background:#000;color:#fff;width:44px !important;height:44px !important;line-height:44px !important;border-bottom:1px solid var(--fuge) !important}
 .leaflet-bar a:hover{background:var(--yellow);color:var(--dark)}
 .center-btn{display:flex !important;align-items:center;justify-content:center}
-.parcel{background:var(--dark);color:#fff;padding:8px 12px;display:flex;align-items:baseline;gap:8px;border-left:4px solid var(--yellow)}
+.leaflet-bottom .parcel.leaflet-control{margin-bottom:6px}
+.leaflet-left .parcel.leaflet-control{margin-left:6px}
+.leaflet-right .parcel.leaflet-control{margin-right:6px}
+.parcel{background:var(--dark);color:#fff;padding:4px 8px;display:flex;align-items:baseline;gap:5px;border-left:3px solid var(--yellow)}
 .parcel[hidden]{display:none}
-.parcel span{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--on-dark)}
-.parcel b{font-size:20px;font-weight:900;line-height:1}
-.parcel small{font-size:11px;font-weight:700;color:var(--on-dark)}
-.speedbox{border-left:0;border-right:4px solid var(--yellow);flex-wrap:wrap;justify-content:flex-end;row-gap:4px;max-width:175px}
-.speedbox em{flex-basis:100%;text-align:right;font-style:normal;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--on-dark)}
-.speedbox svg{width:18px;height:18px;align-self:center;color:var(--yellow)}
+.parcel span{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--on-dark)}
+.parcel b{font-size:14px;font-weight:900;line-height:1}
+.parcel small{font-size:9px;font-weight:700;color:var(--on-dark)}
+.speedbox{border-left:0;border-right:3px solid var(--yellow)}
+.speedbox em{font-style:normal;font-size:9px;font-weight:700;color:var(--on-dark)}
 .tr-arrow{background:none;border:0}
 .tr-arrow svg{display:block;width:30px;height:30px;overflow:visible}
 .panel{flex:none;background:var(--dark);padding:12px 16px 16px;display:flex;flex-direction:column;gap:12px}
@@ -282,14 +284,12 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (v <= STAND) return 'stop';
     return v < soll - TOL ? 'up' : v > soll + TOL ? 'down' : 'ok';
   }
-  function svgPath(p, cls) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"' + (cls ? ' class="' + cls + '"' : '') + '>' + p + '</svg>'; }
   function renderSpeed(v) {
     var s = sollSpeed(), st = speedState(v, s.v);
     var txt = { up: 'schneller', down: 'langsamer', stop: 'Stillstand', ok: 'im Soll' };
     speedBox.hidden = v === null;
     if (v !== null) {
-      speedBox.innerHTML = '<span>Tempo</span><b>' + (v <= STAND ? '–' : v.toFixed(1)) + '</b><small>km/h</small>'
-        + (st && st !== 'ok' ? svgPath(ARROW[st]) : '') + '<em>Soll ' + s.v.toFixed(1) + (s.flow ? ' · Durchfluss' : '') + '</em>';
+      speedBox.innerHTML = '<span>Tempo</span><b>' + (v <= STAND ? '–' : v.toFixed(1)) + '</b><small>km/h</small><em>· Soll ' + s.v.toFixed(1) + '</em>';
       speedBox.setAttribute('aria-label', 'Tempo ' + (v <= STAND ? 'Stillstand' : v.toFixed(1) + ' km/h, ' + txt[st]));
     }
     // Pfeil neben dem Traktor nur während der Aufzeichnung
