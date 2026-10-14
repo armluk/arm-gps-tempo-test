@@ -188,7 +188,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     onAdd: function () { var d = L.DomUtil.create('div', 'parcel'); d.setAttribute('aria-live', 'polite'); d.hidden = true; return d; }
   });
   var parcelBox = new ParcelCtl().addTo(map).getContainer();
-  var parcel = { busy: false, ll: null, t: 0, timer: null };
+  var parcel = { busy: false, ll: null, t: 0, timer: null, cur: null };
   function parcelQuery() {
     var gps = !!lastLL, ll = gps ? L.latLng(lastLL) : map.getCenter();
     if (parcel.busy) return;
@@ -199,6 +199,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       + '&mapExtent=' + [ll.lng - 0.001, ll.lat - 0.001, ll.lng + 0.001, ll.lat + 0.001].map(function (n) { return n.toFixed(7); }).join(',') + '&imageDisplay=100,100,96';
     fetch(url).then(function (r) { return r.ok ? r.json() : Promise.reject(); }).then(function (j) {
       var a = j.results && j.results[0] && j.results[0].attributes;
+      parcel.cur = gps && a && a.number ? (a.ak ? a.ak + ' ' : '') + a.number : null;
       parcelBox.innerHTML = a && a.number
         ? '<span>Parzelle' + (gps ? '' : ' · Kartenmitte') + '</span><b>' + String(a.number).replace(/[<>&]/g, '') + '</b>' + (a.ak ? '<small>' + String(a.ak).replace(/[<>&]/g, '') + '</small>' : '')
         : '<span>Parzelle' + (gps ? '' : ' · Kartenmitte') + '</span><b>–</b>';
@@ -295,7 +296,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   var rec = null, saved = null, watchId = null, demoTimer = null, wakeLock = null, follow = true, lastLL = null, samples = [], clockTimer = null;
 
   function newRec() {
-    return { origin: null, prevBoom: null, ref: null, quads: [], colors: [], track: [], cells: new Set(), sum: 0, start: Date.now(), end: null, total0: null };
+    return { origin: null, prevBoom: null, ref: null, quads: [], colors: [], track: [], cells: new Set(), sum: 0, parcels: {}, start: Date.now(), end: null, total0: null };
   }
 
   // lokale Meter-Koordinaten um den ersten Punkt
@@ -438,6 +439,8 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       rec.quads.push(ll); rec.colors.push(col);
       L.polygon(ll, coverStyle(col)).addTo(coverLayer);
       rec.sum += shoelace(q);
+      // befahrene Fläche pro Parzelle (Nummer an der Traktor-Position, inkl. Überlappung)
+      if (parcel.cur) rec.parcels[parcel.cur] = (rec.parcels[parcel.cur] || 0) + shoelace(q);
       rasterize(rec, q);
     }
     rec.prevBoom = { l: bl, r: br, c: c };
@@ -474,7 +477,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (rec) {
       rec.end = Date.now();
       var st = stats(); st.rate = cfg.rate;
-      saved = { quads: rec.quads, colors: rec.colors, track: rec.track, stats: st, cfg: JSON.parse(JSON.stringify(cfg)), date: new Date(rec.start).toISOString() };
+      saved = { quads: rec.quads, colors: rec.colors, track: rec.track, parcels: rec.parcels, stats: st, cfg: JSON.parse(JSON.stringify(cfg)), date: new Date(rec.start).toISOString() };
       var stored = true;
       try { localStorage.setItem(STORE, JSON.stringify(saved)); } catch (e) { stored = false; showMsg('Karte konnte auf diesem Gerät nicht gespeichert werden. Bitte herunterladen.'); }
       rec = null;
@@ -553,7 +556,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   });
 
   function current() {
-    if (rec) return { quads: rec.quads, colors: rec.colors, track: rec.track, stats: stats(), cfg: cfg, date: new Date(rec.start).toISOString() };
+    if (rec) return { quads: rec.quads, colors: rec.colors, track: rec.track, parcels: rec.parcels, stats: stats(), cfg: cfg, date: new Date(rec.start).toISOString() };
     return saved;
   }
   function download(name, type, text) {
@@ -566,11 +569,18 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   function fileBase(d) { return 'guelle-karte-' + d.date.slice(0, 16).replace(/[:T]/g, '-'); }
   function props(d) {
     var measured = d.stats.measured !== null && d.stats.measured !== undefined;
-    return { datum: d.date, flaeche_ha: Number(d.stats.area.toFixed(3)), menge_m3: measured ? Number(d.stats.measured.toFixed(1)) : Math.round(d.stats.area * (d.stats.rate || d.cfg.rate)), menge_quelle: measured ? 'Durchflussmesser' : 'berechnet', ueberlappung_prozent: Math.round(d.stats.overlap), arbeitsbreite_m: d.cfg.width, positionsquelle: d.cfg.source === 'antenna' ? 'Antenne' : 'Handy', abstand_verteiler_m: d.cfg.source === 'antenna' ? d.cfg.aOffset : d.cfg.offset, seitlicher_versatz_m: d.cfg.source === 'antenna' ? d.cfg.aSide : 0, ausbringmenge_m3_ha: d.cfg.rate };
+    return { datum: d.date, flaeche_ha: Number(d.stats.area.toFixed(3)), menge_m3: measured ? Number(d.stats.measured.toFixed(1)) : Math.round(d.stats.area * (d.stats.rate || d.cfg.rate)), menge_quelle: measured ? 'Durchflussmesser' : 'berechnet', ueberlappung_prozent: Math.round(d.stats.overlap), arbeitsbreite_m: d.cfg.width, positionsquelle: d.cfg.source === 'antenna' ? 'Antenne' : 'Handy', abstand_verteiler_m: d.cfg.source === 'antenna' ? d.cfg.aOffset : d.cfg.offset, seitlicher_versatz_m: d.cfg.source === 'antenna' ? d.cfg.aSide : 0, ausbringmenge_m3_ha: d.cfg.rate, parzellen: parcelList(d).map(function (x) { return x.nr; }).join(', ') };
   }
+  // Parzellen mit befahrener Fläche, grösste zuerst
+  function parcelList(d) {
+    var o = d.parcels || {};
+    return Object.keys(o).map(function (k) { return { nr: k, ha: Number((o[k] / 10000).toFixed(3)) }; }).sort(function (a, b) { return b.ha - a.ha; });
+  }
+  function esc(s) { return String(s).replace(/[<>&]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; }); }
   $('dlGeo').addEventListener('click', function () {
     var d = current(); if (!d || !d.quads.length) { showMsg('Noch keine Fläche aufgezeichnet.'); return; }
     var base = props(d);
+    base.parzellen_flaeche = parcelList(d).map(function (x) { return { parzelle: x.nr, befahren_ha: x.ha }; });
     var features = CLASSES.map(function (cl) {
       var qs = d.quads.filter(function (q, i) { return ((d.colors && d.colors[i]) || YELLOW) === cl.color; });
       if (!qs.length) return null;
@@ -584,17 +594,21 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     var d = current(); if (!d || !d.quads.length) { showMsg('Noch keine Fläche aufgezeichnet.'); return; }
     var p = props(d);
     function poly(q) { var r = q.concat([q[0]]); return '<Polygon><outerBoundaryIs><LinearRing><coordinates>' + r.map(function (pt) { return pt[1].toFixed(7) + ',' + pt[0].toFixed(7) + ',0'; }).join(' ') + '</coordinates></LinearRing></outerBoundaryIs></Polygon>'; }
+    var pl = parcelList(d);
+    var parcTxt = pl.length ? ' · Parzellen: ' + pl.map(function (x) { return esc(x.nr) + ' (' + x.ha.toFixed(2) + ' ha)'; }).join(', ') : '';
     var styles = '', marks = '';
     CLASSES.forEach(function (cl, n) {
       var qs = d.quads.filter(function (q, i) { return ((d.colors && d.colors[i]) || YELLOW) === cl.color; });
       if (!qs.length) return;
       styles += '<Style id="f' + n + '"><LineStyle><width>0</width></LineStyle><PolyStyle><color>' + cl.kml + '</color><outline>0</outline></PolyStyle></Style>';
-      marks += '<Placemark><name>' + cl.name + '</name><description>Fläche ' + p.flaeche_ha + ' ha · Menge ' + p.menge_m3 + ' m³ (' + p.menge_quelle + ') · Überlappung ' + p.ueberlappung_prozent + ' % · Arbeitsbreite ' + p.arbeitsbreite_m + ' m · Soll ' + p.ausbringmenge_m3_ha + ' m³/ha</description><styleUrl>#f' + n + '</styleUrl><MultiGeometry>' + qs.map(poly).join('') + '</MultiGeometry></Placemark>';
+      marks += '<Placemark><name>' + cl.name + '</name><description>Fläche ' + p.flaeche_ha + ' ha · Menge ' + p.menge_m3 + ' m³ (' + p.menge_quelle + ') · Überlappung ' + p.ueberlappung_prozent + ' % · Arbeitsbreite ' + p.arbeitsbreite_m + ' m · Soll ' + p.ausbringmenge_m3_ha + ' m³/ha' + parcTxt + '</description><styleUrl>#f' + n + '</styleUrl><MultiGeometry>' + qs.map(poly).join('') + '</MultiGeometry></Placemark>';
     });
     var line = '<LineString><coordinates>' + d.track.map(function (pt) { return pt[1].toFixed(7) + ',' + pt[0].toFixed(7) + ',0'; }).join(' ') + '</coordinates></LineString>';
     var kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Gülle-Karte ' + p.datum.slice(0, 10) + '</name>' + styles +
       '<Style id="t"><LineStyle><color>ffffffff</color><width>2</width></LineStyle></Style>' + marks +
-      '<Placemark><name>Fahrspur</name><styleUrl>#t</styleUrl>' + line + '</Placemark></Document></kml>';
+      '<Placemark><name>Fahrspur</name><styleUrl>#t</styleUrl>' + line + '</Placemark>' +
+      (pl.length ? '<ExtendedData>' + pl.map(function (x) { return '<Data name="Parzelle ' + esc(x.nr) + '"><value>' + x.ha.toFixed(3) + ' ha befahren</value></Data>'; }).join('') + '</ExtendedData>' : '') +
+      '</Document></kml>';
     download(fileBase(d) + '.kml', 'application/vnd.google-earth.kml+xml', kml);
   });
 
