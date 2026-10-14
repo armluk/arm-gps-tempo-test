@@ -32,6 +32,11 @@ nav.tabs a[aria-current]{color:#fff;border-bottom-color:var(--yellow)}
 .parcel span{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--on-dark)}
 .parcel b{font-size:20px;font-weight:900;line-height:1}
 .parcel small{font-size:11px;font-weight:700;color:var(--on-dark)}
+.speedbox{border-left:0;border-right:4px solid var(--yellow);flex-wrap:wrap;justify-content:flex-end;row-gap:4px;max-width:175px}
+.speedbox em{flex-basis:100%;text-align:right;font-style:normal;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--on-dark)}
+.speedbox svg{width:18px;height:18px;align-self:center;color:var(--yellow)}
+.tr-arrow{background:none;border:0}
+.tr-arrow svg{display:block;width:30px;height:30px;overflow:visible}
 .panel{flex:none;background:var(--dark);padding:12px 16px 16px;display:flex;flex-direction:column;gap:12px}
 .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--fuge);border:1px solid var(--fuge)}
 .stat{background:var(--surface);padding:10px 8px;display:flex;flex-direction:column;gap:4px}
@@ -130,6 +135,11 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <div class="set-row">
 <div class="set-head"><label for="rate">Ausbringmenge</label><output id="rateOut">25 m³/ha</output></div>
 <div class="ctrl"><button class="step" type="button" data-k="rate" data-d="-1" aria-label="Ausbringmenge um 1 m³/ha verringern">−</button><input id="rate" type="range" min="0" max="100" step="1" value="25"><button class="step" type="button" data-k="rate" data-d="1" aria-label="Ausbringmenge um 1 m³/ha erhöhen">+</button></div>
+</div>
+<div class="set-row">
+<div class="set-head"><label for="speed">Soll-Geschwindigkeit</label><output id="speedOut">6.0 km/h</output></div>
+<div class="ctrl"><button class="step" type="button" data-k="speed" data-d="-1" aria-label="Soll-Geschwindigkeit um 0.5 km/h verringern">−</button><input id="speed" type="range" min="0" max="15" step="0.5" value="6"><button class="step" type="button" data-k="speed" data-d="1" aria-label="Soll-Geschwindigkeit um 0.5 km/h erhöhen">+</button></div>
+<p class="note">Mit verbundenem Durchflussmesser wird die Soll-Geschwindigkeit aus Durchfluss, Ausbringmenge und Arbeitsbreite berechnet. Pfeil neben dem Traktor: hoch = schneller, runter = langsamer, «=» = Stillstand, kein Pfeil = im Bereich ±0.5 km/h.</p>
 </div>
 </div>
 </section>
@@ -247,6 +257,54 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   var YELLOW = '#FFF005', LOW = '#FFFFFF', HIGH = '#C62828';
   function coverStyle(color) { return { stroke: false, fillColor: color || YELLOW, fillOpacity: 0.45, interactive: false }; }
 
+  // ---------- Ist-Geschwindigkeit: Feld unten rechts und Pfeil neben dem Traktor ----------
+  var TOL = 0.5;
+  var ARROW = {
+    up: '<path d="M12 20V5"/><path d="M5 11l7-7 7 7"/>',
+    down: '<path d="M12 4v15"/><path d="M5 13l7 7 7-7"/>',
+    stop: '<path d="M5 9h14"/><path d="M5 15h14"/>'
+  };
+  var SpeedCtl = L.Control.extend({
+    options: { position: 'bottomright' },
+    onAdd: function () { var d = L.DomUtil.create('div', 'parcel speedbox'); d.setAttribute('aria-live', 'polite'); d.hidden = true; return d; }
+  });
+  var speedBox = new SpeedCtl().addTo(map).getContainer();
+  var arrowMark = L.marker([0, 0], { interactive: false, keyboard: false, zIndexOffset: 1000,
+    icon: L.divIcon({ className: 'tr-arrow', html: '', iconSize: [30, 30], iconAnchor: [-12, 15] }) });
+  var arrowState = null;
+  // Soll: aus dem Durchfluss (Tempo, bei dem die Ist-Menge der Ausbringmenge entspricht), sonst Einstellung
+  function sollSpeed() {
+    if (flowLive() && flow.lmin >= MIN_FLOW && cfg.rate > 0 && cfg.width > 0) return { v: flow.lmin * 0.6 / (cfg.rate * cfg.width), flow: true };
+    return { v: cfg.speed, flow: false };
+  }
+  function speedState(v, soll) {
+    if (v === null) return null;
+    if (v <= STAND) return 'stop';
+    return v < soll - TOL ? 'up' : v > soll + TOL ? 'down' : 'ok';
+  }
+  function svgPath(p, cls) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"' + (cls ? ' class="' + cls + '"' : '') + '>' + p + '</svg>'; }
+  function renderSpeed(v) {
+    var s = sollSpeed(), st = speedState(v, s.v);
+    var txt = { up: 'schneller', down: 'langsamer', stop: 'Stillstand', ok: 'im Soll' };
+    speedBox.hidden = v === null;
+    if (v !== null) {
+      speedBox.innerHTML = '<span>Tempo</span><b>' + (v <= STAND ? '–' : v.toFixed(1)) + '</b><small>km/h</small>'
+        + (st && st !== 'ok' ? svgPath(ARROW[st]) : '') + '<em>Soll ' + s.v.toFixed(1) + (s.flow ? ' · Durchfluss' : '') + '</em>';
+      speedBox.setAttribute('aria-label', 'Tempo ' + (v <= STAND ? 'Stillstand' : v.toFixed(1) + ' km/h, ' + txt[st]));
+    }
+    // Pfeil neben dem Traktor nur während der Aufzeichnung
+    var show = !!(rec && lastLL && st && st !== 'ok');
+    if (!show) { if (map.hasLayer(arrowMark)) arrowMark.remove(); arrowState = null; return; }
+    arrowMark.setLatLng(lastLL);
+    if (!map.hasLayer(arrowMark)) arrowMark.addTo(map);
+    if (arrowState !== st) {
+      arrowState = st;
+      // gelb mit schwarzem Rand, damit er auf dem Luftbild gut sichtbar ist
+      arrowMark.setIcon(L.divIcon({ className: 'tr-arrow', iconSize: [30, 30], iconAnchor: [-12, 15],
+        html: '<svg viewBox="0 0 24 24" fill="none" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><g stroke="#000" stroke-width="5.5">' + ARROW[st] + '</g><g stroke="#FFF005" stroke-width="2.5">' + ARROW[st] + '</g></svg>' }));
+    }
+  }
+
   // ---------- Durchflussmesser (Bluetooth LE, ESP32) ----------
   var FLOW_SVC = '6b1f0001-4a3b-4d52-9a2e-3c1d5e7f8a90', FLOW_CHR = '6b1f0002-4a3b-4d52-9a2e-3c1d5e7f8a90';
   var MIN_FLOW = 20, FLOW_STALE_MS = 5000;
@@ -312,10 +370,11 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   });
 
   // ---------- Zustand ----------
-  var cfg = { width: 12, offset: 3, rate: 25, source: 'phone', aOffset: 0, aSide: 0 };
-  var KEYS = ['width', 'offset', 'rate', 'aOffset', 'aSide'];
-  var steps = { width: 0.25, offset: 0.5, rate: 1, aOffset: 0.05, aSide: 0.05 };
+  var cfg = { width: 12, offset: 3, rate: 25, speed: 6, source: 'phone', aOffset: 0, aSide: 0 };
+  var KEYS = ['width', 'offset', 'rate', 'speed', 'aOffset', 'aSide'];
+  var steps = { width: 0.25, offset: 0.5, rate: 1, speed: 0.5, aOffset: 0.05, aSide: 0.05 };
   var fmtCfg = {
+    speed: function (v) { return v.toFixed(1) + ' km/h'; },
     width: function (v) { return v.toFixed(2) + ' m'; },
     offset: function (v) { return v.toFixed(1) + ' m'; },
     rate: function (v) { return v.toFixed(0) + ' m³/ha'; },
@@ -368,6 +427,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   function render() {
     var v = speedAvg();
     $('sSpeed').innerHTML = (v === null ? '–' : v <= STAND ? '–' : v.toFixed(1)) + '<small>km/h</small>';
+    renderSpeed(v);
     var st = stats();
     $('sArea').innerHTML = st.area.toFixed(2) + '<small>ha</small>';
     var amount = st.measured !== null && st.measured !== undefined ? st.measured : st.area * (st.rate || cfg.rate);
