@@ -28,6 +28,9 @@ nav.tabs a[aria-current]{color:#fff;border-bottom-color:var(--yellow)}
 .leaflet-bar a:hover{background:var(--yellow);color:var(--dark)}
 .center-btn{display:flex !important;align-items:center;justify-content:center}
 .leaflet-bar a.center-btn.on{background:var(--yellow);color:var(--dark)}
+#northSvg{transform-origin:50% 50%}
+#northSvg text{fill:var(--dark)}
+.leaflet-bar a.center-btn.on #northSvg text{fill:var(--yellow)}
 .leaflet-bottom .parcel.leaflet-control{margin-bottom:6px}
 .leaflet-left .parcel.leaflet-control{margin-left:6px}
 .leaflet-right .parcel.leaflet-control{margin-right:6px}
@@ -239,6 +242,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet-rotate@0.2.8/dist/leaflet-rotate.js"></script>
 <script>
 (function () {
   var STAND = 0.5, WINDOW_MS = 5000, MAX_JUMP = 30, CELL = 1, STORE = 'arm-guelle-karte-v1';
@@ -246,7 +250,8 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   var $ = function (id) { return document.getElementById(id); };
 
   // ---------- Karte ----------
-  var map = L.map('map', { zoomControl: false, preferCanvas: true, zoomSnap: 0, maxZoom: 23 }).setView([46.8745, 7.7965], 16);
+  var map = L.map('map', { zoomControl: false, preferCanvas: true, zoomSnap: 0, maxZoom: 23,
+    rotate: true, bearing: 0, rotateControl: false, touchRotate: false, shiftKeyRotate: false }).setView([46.8745, 7.7965], 16);
   L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg', {
     maxZoom: 23, maxNativeZoom: 20, attribution: 'Luftbild © <a href="https://www.swisstopo.admin.ch/">swisstopo</a>'
   }).addTo(map);
@@ -264,6 +269,11 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       z.id = 'detailBtn'; z.href = '#'; z.title = 'Verteiler gross anzeigen'; z.setAttribute('role', 'button'); z.setAttribute('aria-label', 'Verteiler gross anzeigen'); z.setAttribute('aria-pressed', 'false');
       z.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M15 15l7 7M10 6.5v7M6.5 10h7"/></svg>';
       L.DomEvent.on(z, 'click', function (e) { L.DomEvent.preventDefault(e); setDetail(!detail); });
+      var n = L.DomUtil.create('a', 'center-btn', div);
+      n.id = 'northBtn'; n.href = '#'; n.title = 'Fahrtrichtung oben / Norden oben'; n.setAttribute('role', 'button'); n.setAttribute('aria-label', 'Karte in Fahrtrichtung drehen'); n.setAttribute('aria-pressed', 'false');
+      // Nadel zeigt immer nach Norden (dreht mit der Karte)
+      n.innerHTML = '<svg id="northSvg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l4 10h-8z" fill="currentColor"/><path d="M12 22l-4-10h8z" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="12" y="10.5" text-anchor="middle" font-size="5" font-weight="900" fill="var(--dark)">N</text></svg>';
+      L.DomEvent.on(n, 'click', function (e) { L.DomEvent.preventDefault(e); setHeadingUp(!cfg.headingUp); });
       L.DomEvent.disableClickPropagation(div);
       return div;
     }
@@ -299,7 +309,58 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   function followTo() {
     if (!follow) return;
     var c = detail ? detailCenter() : L.latLng(lastLL);
-    if (c) map.panTo(c, { animate: false });
+    if (!c) return;
+    // Fahrtrichtung oben: Traktor ins untere Drittel, damit man mehr von vorne sieht
+    if (cfg.headingUp && !detail && rot.cur !== null) {
+      var mpp = 156543.03 * Math.cos(c.lat * D) / Math.pow(2, map.getZoom());
+      var d = map.getSize().y / 6 * mpp, h = rot.cur * D;
+      c = L.latLng(c.lat + Math.cos(h) * d / 110540, c.lng + Math.sin(h) * d / (111320 * Math.cos(c.lat * D)));
+    }
+    map.panTo(c, { animate: false });
+  }
+
+  // ---------- Karte in Fahrtrichtung drehen ----------
+  // Richtung geglättet (Mittelwert als Vektor), unter 1.5 km/h eingefroren;
+  // die Karte dreht höchstens 75°/s nach – eine Kehrtwende dauert so gut 2 s.
+  var ROT_MIN_KMH = 1.5, ROT_MAX_DEG_S = 75, ROT_ALPHA = 0.25;
+  var rot = { vx: 0, vy: 0, target: null, cur: null, ref: null, timer: null, t: 0 };
+  function rotFeed(lat, lon, kmh, headingDeg) {
+    var v = speedAvg();
+    if (v === null || v < ROT_MIN_KMH) { rot.ref = null; return; }   // Stillstand/langsam: nicht drehen
+    var hd = null;
+    if (headingDeg !== null && headingDeg !== undefined && !isNaN(headingDeg) && kmh !== null && kmh >= ROT_MIN_KMH) hd = headingDeg;
+    else {
+      // ohne GPS-Kurs: aus der Bewegung, mindestens 3 m
+      if (!rot.ref) { rot.ref = { lat: lat, lon: lon }; return; }
+      var p = toXY(rot.ref, lat, lon);
+      if (Math.hypot(p.x, p.y) < 3) return;
+      hd = Math.atan2(p.x, p.y) / D; rot.ref = { lat: lat, lon: lon };
+    }
+    rot.vx = rot.vx * (1 - ROT_ALPHA) + Math.sin(hd * D) * ROT_ALPHA;
+    rot.vy = rot.vy * (1 - ROT_ALPHA) + Math.cos(hd * D) * ROT_ALPHA;
+    if (rot.target === null) { rot.vx = Math.sin(hd * D); rot.vy = Math.cos(hd * D); }
+    rot.target = (Math.atan2(rot.vx, rot.vy) / D + 360) % 360;
+  }
+  function rotStep() {
+    var now = Date.now(), dt = Math.min(0.5, (now - rot.t) / 1000); rot.t = now;
+    if (!cfg.headingUp || rot.target === null) return;
+    if (rot.cur === null) rot.cur = rot.target;
+    var diff = angSigned(rot.target * D, rot.cur * D), max = ROT_MAX_DEG_S * dt;
+    var step = Math.abs(diff) < 0.3 ? diff : Math.max(-max, Math.min(max, diff * 0.35));
+    if (step === 0) return;
+    rot.cur = (rot.cur + step + 360) % 360;
+    map.setBearing(-rot.cur);               // Fahrtrichtung zeigt nach oben
+    northNeedle();
+  }
+  function northNeedle() { var s = $('northSvg'); if (s) s.style.transform = 'rotate(' + (cfg.headingUp && rot.cur !== null ? -rot.cur : 0) + 'deg)'; }
+  function setHeadingUp(on) {
+    cfg.headingUp = !!on; saveCfg();
+    var b = $('northBtn'); if (b) { b.setAttribute('aria-pressed', String(cfg.headingUp)); b.classList.toggle('on', cfg.headingUp); b.setAttribute('aria-label', cfg.headingUp ? 'Norden oben anzeigen' : 'Karte in Fahrtrichtung drehen'); }
+    clearInterval(rot.timer); rot.timer = null;
+    if (cfg.headingUp) { rot.t = Date.now(); rot.timer = setInterval(rotStep, 50); }
+    else { rot.cur = null; map.setBearing(0); }
+    northNeedle();
+    if (lastLL) followTo();
   }
   map.on('dragstart', function () { follow = false; });
 
@@ -492,7 +553,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   });
 
   // ---------- Zustand ----------
-  var cfg = { width: 12, offset: 3, rate: 25, speed: 6, source: 'phone', aOffset: 0, aSide: 0, turnPause: true };
+  var cfg = { width: 12, offset: 3, rate: 25, speed: 6, source: 'phone', aOffset: 0, aSide: 0, turnPause: true, headingUp: false };
   var KEYS = ['width', 'offset', 'rate', 'speed', 'aOffset', 'aSide'];
   var steps = { width: 0.25, offset: 0.5, rate: 1, speed: 0.5, aOffset: 0.05, aSide: 0.05 };
   var fmtCfg = {
@@ -664,8 +725,9 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     lastLL = [lat, lon]; lastFixAt = Date.now();
     if (!map.hasLayer(tractor)) tractor.addTo(map);
     tractor.setLatLng(lastLL);
-    followTo();
     if (kmh !== null) { samples.push({ v: kmh, t: t }); samples = samples.filter(function (s) { return t - s.t <= WINDOW_MS; }); }
+    rotFeed(lat, lon, kmh, headingDeg);
+    followTo();
     if (acc !== null) {
       var accTxt = acc < 1 ? '±' + Math.max(1, Math.round(acc * 100)) + ' cm' + (acc <= 0.1 ? ' · RTK' : '') : '±' + Math.round(acc) + ' m' + (acc > 20 ? ' (schwach)' : '');
       $('status').innerHTML = '<span class="rec-dot"></span>' + (rec ? 'Aufzeichnung' : 'GPS') + ' · ' + accTxt + (rec && rec.turning ? ' · Wenden' : '') + (rec && rec.turns ? ' · ' + rec.turns + '× gewendet' : '');
@@ -944,6 +1006,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   KEYS.forEach(function (k) { setCfg(k, cfg[k]); });
   setSource(cfg.source);
   setTurnPause(cfg.turnPause);
+  setHeadingUp(cfg.headingUp);
   setView(location.hash === '#tempo' ? 'tempo' : 'karte');   // Standard: Karte
   try {
     saved = JSON.parse(localStorage.getItem(STORE));
