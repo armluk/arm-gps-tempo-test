@@ -141,7 +141,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <div class="set-row">
 <div class="set-head"><label for="speed">Soll-Geschwindigkeit</label><output id="speedOut">6.0 km/h</output></div>
 <div class="ctrl"><button class="step" type="button" data-k="speed" data-d="-1" aria-label="Soll-Geschwindigkeit um 0.5 km/h verringern">−</button><input id="speed" type="range" min="0" max="15" step="0.5" value="6"><button class="step" type="button" data-k="speed" data-d="1" aria-label="Soll-Geschwindigkeit um 0.5 km/h erhöhen">+</button></div>
-<p class="note">Mit verbundenem Durchflussmesser wird die Soll-Geschwindigkeit aus Durchfluss, Ausbringmenge und Arbeitsbreite berechnet. Pfeil neben dem Traktor: hoch = schneller, runter = langsamer, «=» = Stillstand, kein Pfeil = im Bereich ±0.5 km/h.</p>
+<p class="note">Mit verbundenem Durchflussmesser wird die Soll-Geschwindigkeit aus Durchfluss, Ausbringmenge und Arbeitsbreite berechnet. Pfeil neben dem Traktor: hoch = schneller, runter = langsamer, «=» = Stillstand, kein Pfeil = im Bereich ±0.5 km/h oder beim Wenden.</p>
 </div>
 <div class="set-row">
 <div class="set-head"><span class="lbl" id="turnLbl">Beim Wenden</span></div>
@@ -301,8 +301,8 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       speedBox.setAttribute('aria-label', 'Tempo ' + (v <= STAND ? 'Stillstand' : v.toFixed(1) + ' km/h, ' + txt[st]));
     }
     // Pfeil neben dem Traktor nur während der Aufzeichnung
-    // beim Wenden ist langsames Fahren normal – dann kein Pfeil
-    var show = !!(rec && lastLL && st && st !== 'ok' && !(rec.turning && st !== 'stop'));
+    // beim Wenden kein Pfeil und kein «=»
+    var show = !!(rec && lastLL && st && st !== 'ok' && !rec.turning);
     if (!show) { if (map.hasLayer(arrowMark)) arrowMark.remove(); arrowState = null; return; }
     arrowMark.setLatLng(lastLL);
     if (!map.hasLayer(arrowMark)) arrowMark.addTo(map);
