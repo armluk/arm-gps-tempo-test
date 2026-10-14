@@ -250,7 +250,8 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   var $ = function (id) { return document.getElementById(id); };
 
   // ---------- Karte ----------
-  var map = L.map('map', { zoomControl: false, preferCanvas: true, zoomSnap: 0, maxZoom: 23,
+  // Zeichenfläche mit Rand (padding), damit beim flüssigen Verschieben zwischen dem Neuzeichnen nichts fehlt
+  var map = L.map('map', { zoomControl: false, renderer: L.canvas({ padding: 0.5 }), zoomSnap: 0, maxZoom: 23,
     rotate: true, bearing: 0, rotateControl: false, touchRotate: false, shiftKeyRotate: false }).setView([46.8745, 7.7965], 16);
   L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg', {
     maxZoom: 23, maxNativeZoom: 20, attribution: 'Luftbild © <a href="https://www.swisstopo.admin.ch/">swisstopo</a>'
@@ -294,9 +295,12 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     return Math.min(map.getMaxZoom(), Math.log2(156543.03 * Math.cos(lat) / mpp));
   }
   function detailCenter() {
-    if (!lastLL) return null;
-    // Verteiler-Position nur, wenn aktuell (beim Wenden/Stehen gibt es keine) – sonst auf den Traktor
-    return lastBoomLL && Date.now() - lastBoomAt < 2000 ? L.latLng((lastLL[0] + lastBoomLL[0]) / 2, (lastLL[1] + lastBoomLL[1]) / 2) : L.latLng(lastLL);
+    var t = disp.ll || (lastLL && L.latLng(lastLL));
+    if (!t) return null;
+    // Mitte zwischen Traktor und Verteiler; ohne aktuellen Verteiler (Wenden/Stehen) auf den Traktor
+    var b = boomAnim.cur;
+    if (!b || Date.now() - lastBoomAt > 2000) return t;
+    return L.latLng((t.lat + (b[0].lat + b[1].lat) / 2) / 2, (t.lng + (b[0].lng + b[1].lng) / 2) / 2);
   }
   function setDetail(on) {
     detail = on;
@@ -306,9 +310,98 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     var c = detailCenter() || map.getCenter();
     map.setView(c, detailZoom(), { animate: false });
   }
+  // ---------- Flüssige Bewegung: Traktor, Verteiler und Karte gleiten zur neuen Position ----------
+  // Das GPS liefert etwa 1× pro Sekunde eine Position. Statt zu springen, wird über die Zeit bis zur
+  // nächsten Position interpoliert. Die Karte wird dabei ohne «moveend» verschoben (kein Neuzeichnen
+  // aller Flächen pro Bild); neu gezeichnet wird höchstens 1× pro Sekunde.
+  var disp = { ll: null, from: null, to: null, t0: 0, dur: 1000, lastFix: 0 };
+  var boomAnim = { from: null, to: null, cur: null };
+  function lerpLL(a, b, k) { return L.latLng(a.lat + (b.lat - a.lat) * k, a.lng + (b.lng - a.lng) * k); }
+  function moveTo(ll) {
+    var now = Date.now();
+    disp.dur = disp.lastFix ? Math.max(120, Math.min(1500, now - disp.lastFix)) : 0;
+    disp.lastFix = now;
+    // vorausschauen: bis zur nächsten Position gleich weiterfahren, damit die Anzeige nicht 1 s hinterherhinkt
+    disp.from = disp.ll || ll; disp.to = predict(disp.prev, ll); disp.prev = ll; disp.t0 = now;
+    if (!disp.ll || disp.from.distanceTo(ll) > MAX_JUMP) { disp.ll = ll; disp.from = ll; disp.to = ll; disp.dur = 0; tractor.setLatLng(ll); }
+  }
+  function predict(prev, ll) {
+    if (!prev) return ll;
+    var d = prev.distanceTo(ll);
+    // 80 % der letzten Strecke vorausrechnen (gedämpft, damit GPS-Zittern nicht verstärkt wird)
+    return d > 0.2 && d < MAX_JUMP ? L.latLng(ll.lat + 0.8 * (ll.lat - prev.lat), ll.lng + 0.8 * (ll.lng - prev.lng)) : ll;
+  }
+  // Verteiler gleitet im gleichen Takt wie der Traktor (moveTo wird vorher im selben GPS-Punkt aufgerufen)
+  function boomTo(pair) {
+    if (!pair) { boomAnim.from = boomAnim.to = boomAnim.cur = boomAnim.prev = null; boomLine.setLatLngs([]); return; }
+    var target = boomAnim.prev ? [predict(boomAnim.prev[0], pair[0]), predict(boomAnim.prev[1], pair[1])] : pair;
+    boomAnim.prev = pair;
+    if (!boomAnim.cur) { boomAnim.from = boomAnim.to = boomAnim.cur = pair; boomLine.setLatLngs(pair); return; }
+    boomAnim.from = boomAnim.cur; boomAnim.to = target;
+  }
+  var lastMoveEnd = 0;
+  function frame() {
+    requestAnimationFrame(frame);
+    if (!disp.to) return;
+    var now = Date.now();
+    var k = disp.dur ? Math.min(1, (now - disp.t0) / disp.dur) : 1;
+    var ll = lerpLL(disp.from, disp.to, k);
+    if (!disp.ll || !ll.equals(disp.ll)) { disp.ll = ll; tractor.setLatLng(ll); if (map.hasLayer(ringMark)) ringMark.setLatLng(ll); }
+    if (boomAnim.to && boomAnim.from) {
+      var b = [lerpLL(boomAnim.from[0], boomAnim.to[0], k), lerpLL(boomAnim.from[1], boomAnim.to[1], k)];
+      if (!boomAnim.cur || !b[0].equals(boomAnim.cur[0])) { boomAnim.cur = b; boomLine.setLatLngs(b); }
+    }
+    // Stück vom letzten Spline-Punkt bis zum Traktor
+    if (rec && rec.splLast) {
+      if (!splineTail) splineTail = L.polyline([], { color: '#FFFFFF', weight: 2, opacity: 0.8, interactive: false }).addTo(map);
+      splineTail.setLatLngs([rec.splLast, disp.ll]);
+    } else if (splineTail) { splineTail.remove(); splineTail = null; }
+    if (!follow || $('map').hidden) return;
+    var c = followCenter();
+    if (!c) return;
+    var off = map._getCenterOffset(c);
+    if (Math.abs(off.x) >= 0.5 || Math.abs(off.y) >= 0.5) {
+      map._rawPanBy(off.round()); map.fire('move');
+      if (now - lastMoveEnd > 1000) { lastMoveEnd = now; map.fire('moveend'); }
+    }
+  }
+  requestAnimationFrame(frame);
+
+  // Spur als Spline (Catmull-Rom) durch die geglätteten Punkte; neue Stützpunkte erst ab 1 m Abstand
+  var SPL_STEPS = 6, splineTail = null;
+  function splineAdd(r, p) {
+    if (!r.spl) r.spl = [];
+    var last = r.spl[r.spl.length - 1];
+    if (last && dist(last, p) < 1) return;
+    r.spl.push(p);
+    if (r.spl.length === 1) { r.splLast = L.latLng(toLL(r.origin, p)); r.trackDraw = [toLL(r.origin, p)]; trackLine.setLatLngs(r.trackDraw); return; }
+    if (r.spl.length < 4) return;
+    if (r.spl.length > 4) r.spl.shift();
+    var p0 = r.spl[0], p1 = r.spl[1], p2 = r.spl[2], p3 = r.spl[3];
+    if (dist(p1, p2) > MAX_JUMP) { r.spl = [p2, p3]; return; }
+    for (var i = 1; i <= SPL_STEPS; i++) {
+      var t = i / SPL_STEPS, t2 = t * t, t3 = t2 * t;
+      var x = 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
+      var y = 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+      var ll = toLL(r.origin, { x: x, y: y });
+      r.trackDraw.push(ll); trackLine.addLatLng(ll);
+    }
+    r.splLast = L.latLng(r.trackDraw[r.trackDraw.length - 1]);
+  }
+
+  function followCenter() {
+    var c = detail ? detailCenter() : disp.ll;
+    if (!c) return null;
+    if (cfg.headingUp && !detail && rot.cur !== null) {
+      var mpp = 156543.03 * Math.cos(c.lat * D) / Math.pow(2, map.getZoom());
+      var d = map.getSize().y / 6 * mpp, h = rot.cur * D;
+      c = L.latLng(c.lat + Math.cos(h) * d / 110540, c.lng + Math.sin(h) * d / (111320 * Math.cos(c.lat * D)));
+    }
+    return c;
+  }
   function followTo() {
     if (!follow) return;
-    var c = detail ? detailCenter() : L.latLng(lastLL);
+    var c = detail ? detailCenter() : (disp.ll || (lastLL && L.latLng(lastLL)));
     if (!c) return;
     // Fahrtrichtung oben: Traktor ins untere Drittel, damit man mehr von vorne sieht
     if (cfg.headingUp && !detail && rot.cur !== null) {
@@ -476,7 +569,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     } else ring.st = null;
     var key = dir ? dir + iv : '';
     if (!dir) { if (map.hasLayer(ringMark)) ringMark.remove(); ring.key = ''; return; }
-    ringMark.setLatLng(lastLL);
+    ringMark.setLatLng(disp.ll || lastLL);
     if (!map.hasLayer(ringMark)) ringMark.addTo(map);
     if (key === ring.key) return;
     ring.key = key;
@@ -724,15 +817,13 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   function onFix(lat, lon, kmh, headingDeg, t, acc) {
     lastLL = [lat, lon]; lastFixAt = Date.now();
     if (!map.hasLayer(tractor)) tractor.addTo(map);
-    tractor.setLatLng(lastLL);
     if (kmh !== null) { samples.push({ v: kmh, t: t }); samples = samples.filter(function (s) { return t - s.t <= WINDOW_MS; }); }
     rotFeed(lat, lon, kmh, headingDeg);
-    followTo();
     if (acc !== null) {
       var accTxt = acc < 1 ? '±' + Math.max(1, Math.round(acc * 100)) + ' cm' + (acc <= 0.1 ? ' · RTK' : '') : '±' + Math.round(acc) + ' m' + (acc > 20 ? ' (schwach)' : '');
       $('status').innerHTML = '<span class="rec-dot"></span>' + (rec ? 'Aufzeichnung' : 'GPS') + ' · ' + accTxt + (rec && rec.turning ? ' · Wenden' : '') + (rec && rec.turns ? ' · ' + rec.turns + '× gewendet' : '');
     }
-    if (!rec) { render(); return; }
+    if (!rec) { moveTo(L.latLng(lastLL)); render(); return; }
 
     if (!rec.origin) rec.origin = { lat: lat, lon: lon };
     var raw = toXY(rec.origin, lat, lon);
@@ -741,8 +832,9 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     var precise = acc !== null && acc < 0.5;
     var p = !precise && rec.sp && dist(rec.sp, raw) < MAX_JUMP ? { x: rec.sp.x * 0.6 + raw.x * 0.4, y: rec.sp.y * 0.6 + raw.y * 0.4 } : raw;
     rec.sp = p;
-    rec.track.push([lat, lon]);
-    trackLine.addLatLng(lastLL);
+    rec.track.push([lat, lon]);          // Rohdaten für den Export
+    moveTo(L.latLng(toLL(rec.origin, p)));
+    splineAdd(rec, p);                   // angezeigte Spur als Spline
 
     // Fahrtrichtung: GPS-Kurs, sonst aus der Bewegung (mind. 2 m)
     var h = null;
@@ -753,11 +845,11 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     detectTurn(p, h);
 
     var v = speedAvg();
-    if (v === null || v <= STAND || h === null) { rec.prevBoom = null; boomLine.setLatLngs([]); render(); return; }
+    if (v === null || v <= STAND || h === null) { rec.prevBoom = null; boomTo(null); render(); return; }
     // mit Durchflussmesser: nur einfärben, wenn tatsächlich Gülle fliesst
-    if (flow.connected && (!flowLive() || flow.lmin < MIN_FLOW)) { rec.prevBoom = null; boomLine.setLatLngs([]); render(); return; }
+    if (flow.connected && (!flowLive() || flow.lmin < MIN_FLOW)) { rec.prevBoom = null; boomTo(null); render(); return; }
     // ohne Durchflussmesser: beim Wenden nicht einfärben (abschaltbar)
-    if (!flow.connected && rec.turning && cfg.turnPause) { rec.prevBoom = null; boomLine.setLatLngs([]); render(); return; }
+    if (!flow.connected && rec.turning && cfg.turnPause) { rec.prevBoom = null; boomTo(null); render(); return; }
 
     var f = { x: Math.sin(h), y: Math.cos(h) }, r = { x: Math.cos(h), y: -Math.sin(h) };
     // Verteiler-Mitte: hinter dem Positionspunkt (Abstand) und bei der Antenne ggf. seitlich versetzt
@@ -767,7 +859,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     lastBoomLL = toLL(rec.origin, c); lastBoomAt = Date.now();
     var half = cfg.width / 2;
     var bl = { x: c.x - half * r.x, y: c.y - half * r.y }, br = { x: c.x + half * r.x, y: c.y + half * r.y };
-    boomLine.setLatLngs([toLL(rec.origin, bl), toLL(rec.origin, br)]);
+    boomTo([L.latLng(toLL(rec.origin, bl)), L.latLng(toLL(rec.origin, br))]);
 
     // erst ab 1 m Vorwärtsbewegung einen neuen Streifen anhängen
     if (rec.prevBoom) {
@@ -841,7 +933,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 
   function begin() {
     if (saved && !confirm('Die gespeicherte Karte wird ersetzt. Neue Aufzeichnung starten?')) return false;
-    coverLayer.clearLayers(); trackLine.setLatLngs([]); boomLine.setLatLngs([]);
+    coverLayer.clearLayers(); trackLine.setLatLngs([]); boomTo(null);
     saved = null; samples = [];
     rec = newRec();
     if (flow.total !== null) rec.total0 = flow.total;
@@ -864,12 +956,14 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (rec) {
       rec.end = Date.now();
       var st = stats(); st.rate = cfg.rate;
-      saved = { quads: rec.quads, colors: rec.colors, track: rec.track, parcels: rec.parcels, stats: st, cfg: JSON.parse(JSON.stringify(cfg)), date: new Date(rec.start).toISOString() };
+      // angezeigte Spline-Spur bis zum letzten Punkt abschliessen
+      if (rec.trackDraw && rec.sp) { rec.trackDraw.push(toLL(rec.origin, rec.sp)); trackLine.setLatLngs(rec.trackDraw); }
+      saved = { quads: rec.quads, colors: rec.colors, track: rec.track, trackDraw: rec.trackDraw, parcels: rec.parcels, stats: st, cfg: JSON.parse(JSON.stringify(cfg)), date: new Date(rec.start).toISOString() };
       var stored = true;
       try { localStorage.setItem(STORE, JSON.stringify(saved)); } catch (e) { stored = false; showMsg('Karte konnte auf diesem Gerät nicht gespeichert werden. Bitte herunterladen.'); }
       rec = null;
     }
-    boomLine.setLatLngs([]);
+    boomTo(null);
     if (!tempoOnly) samples = [];
     $('gpsOnly').hidden = false;
     $('startStop').className = 'btn';
@@ -937,7 +1031,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   $('clear').addEventListener('click', function () {
     if (rec) return;
     if ((saved || coverLayer.getLayers().length) && !confirm('Karte löschen und neu beginnen?')) return;
-    coverLayer.clearLayers(); trackLine.setLatLngs([]); boomLine.setLatLngs([]);
+    coverLayer.clearLayers(); trackLine.setLatLngs([]); boomTo(null);
     saved = null;
     try { localStorage.removeItem(STORE); } catch (e) {}
     setStatus('Bereit', false);
@@ -1012,7 +1106,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     saved = JSON.parse(localStorage.getItem(STORE));
     if (saved && saved.quads && saved.quads.length) {
       saved.quads.forEach(function (q, i) { L.polygon(q, coverStyle(saved.colors && saved.colors[i])).addTo(coverLayer); });
-      trackLine.setLatLngs(saved.track);
+      trackLine.setLatLngs(saved.trackDraw || saved.track);
       map.fitBounds(L.latLngBounds(saved.track), { padding: [20, 20] });
       follow = false;
       setStatus('Letzte Karte vom ' + new Date(saved.date).toLocaleDateString('de-CH'), false);
