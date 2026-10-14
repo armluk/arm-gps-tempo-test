@@ -143,6 +143,14 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <div class="ctrl"><button class="step" type="button" data-k="speed" data-d="-1" aria-label="Soll-Geschwindigkeit um 0.5 km/h verringern">−</button><input id="speed" type="range" min="0" max="15" step="0.5" value="6"><button class="step" type="button" data-k="speed" data-d="1" aria-label="Soll-Geschwindigkeit um 0.5 km/h erhöhen">+</button></div>
 <p class="note">Mit verbundenem Durchflussmesser wird die Soll-Geschwindigkeit aus Durchfluss, Ausbringmenge und Arbeitsbreite berechnet. Pfeil neben dem Traktor: hoch = schneller, runter = langsamer, «=» = Stillstand, kein Pfeil = im Bereich ±0.5 km/h.</p>
 </div>
+<div class="set-row">
+<div class="set-head"><span class="lbl" id="turnLbl">Beim Wenden</span></div>
+<div class="seg" role="group" aria-labelledby="turnLbl">
+<button type="button" id="turnPause" aria-pressed="true">Nicht einfärben</button>
+<button type="button" id="turnGo" aria-pressed="false">Weiter einfärben</button>
+</div>
+<p class="note">Wenden wird erkannt, wenn sich die Fahrtrichtung auf 10 m um mehr als 45° ändert (auch Rückwärtsfahren). Gilt nur ohne Durchflussmesser – mit Durchflussmesser entscheidet der Durchfluss.</p>
+</div>
 </div>
 </section>
 
@@ -293,7 +301,8 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       speedBox.setAttribute('aria-label', 'Tempo ' + (v <= STAND ? 'Stillstand' : v.toFixed(1) + ' km/h, ' + txt[st]));
     }
     // Pfeil neben dem Traktor nur während der Aufzeichnung
-    var show = !!(rec && lastLL && st && st !== 'ok');
+    // beim Wenden ist langsames Fahren normal – dann kein Pfeil
+    var show = !!(rec && lastLL && st && st !== 'ok' && !(rec.turning && st !== 'stop'));
     if (!show) { if (map.hasLayer(arrowMark)) arrowMark.remove(); arrowState = null; return; }
     arrowMark.setLatLng(lastLL);
     if (!map.hasLayer(arrowMark)) arrowMark.addTo(map);
@@ -370,7 +379,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   });
 
   // ---------- Zustand ----------
-  var cfg = { width: 12, offset: 3, rate: 25, speed: 6, source: 'phone', aOffset: 0, aSide: 0 };
+  var cfg = { width: 12, offset: 3, rate: 25, speed: 6, source: 'phone', aOffset: 0, aSide: 0, turnPause: true };
   var KEYS = ['width', 'offset', 'rate', 'speed', 'aOffset', 'aSide'];
   var steps = { width: 0.25, offset: 0.5, rate: 1, speed: 0.5, aOffset: 0.05, aSide: 0.05 };
   var fmtCfg = {
@@ -384,7 +393,30 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   var rec = null, saved = null, watchId = null, demoTimer = null, wakeLock = null, follow = true, lastLL = null, samples = [], clockTimer = null;
 
   function newRec() {
-    return { origin: null, prevBoom: null, ref: null, quads: [], colors: [], track: [], cells: new Set(), sum: 0, parcels: {}, start: Date.now(), end: null, total0: null };
+    return { origin: null, prevBoom: null, ref: null, quads: [], colors: [], track: [], cells: new Set(), sum: 0, parcels: {}, start: Date.now(), end: null, total0: null, odo: 0, lastP: null, hist: [], turning: false, turnAt: 0, turns: 0 };
+  }
+
+  // ---------- Wendemanöver erkennen ----------
+  // Wenden = Fahrtrichtung ändert sich auf den letzten 10 m Fahrstrecke um mehr als 45° (auch Rückwärtsfahren).
+  // Ende = auf den letzten 5 m wieder geradeaus (< 12°) und mindestens 6 m seit Beginn.
+  var TURN_M = 10, TURN_IN = 45, TURN_OUT_M = 5, TURN_OUT = 12;
+  function angDiff(a, b) { var d = (a - b) / D % 360; if (d > 180) d -= 360; if (d < -180) d += 360; return Math.abs(d); }
+  function headingAgo(m) { for (var i = rec.hist.length - 1; i >= 0; i--) if (rec.odo - rec.hist[i].d >= m) return rec.hist[i]; return null; }
+  function detectTurn(p, h) {
+    var v = speedAvg();
+    if (rec.lastP && v !== null && v > STAND) rec.odo += dist(rec.lastP, p);   // Zittern im Stillstand nicht mitzählen
+    rec.lastP = p;
+    if (h === null) return;
+    var last = rec.hist[rec.hist.length - 1];
+    if (!last || rec.odo - last.d >= 0.5) rec.hist.push({ d: rec.odo, h: h });
+    while (rec.hist.length > 2 && rec.odo - rec.hist[1].d > TURN_M + 2) rec.hist.shift();
+    if (!rec.turning) {
+      var a = headingAgo(TURN_M);
+      if (a && angDiff(h, a.h) > TURN_IN) { rec.turning = true; rec.turnAt = rec.odo; }
+    } else {
+      var b = headingAgo(TURN_OUT_M);
+      if (b && rec.odo - rec.turnAt >= 6 && angDiff(h, b.h) < TURN_OUT) { rec.turning = false; rec.turns++; }
+    }
   }
 
   // lokale Meter-Koordinaten um den ersten Punkt
@@ -418,7 +450,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (rec) {
       var area = rec.cells.size / 10000;
       var measured = rec.total0 !== null && flow.total !== null ? Math.max(0, flow.total - rec.total0) / 1000 : null;
-      return { area: area, overlap: rec.sum > 0 ? Math.max(0, rec.sum - rec.cells.size) / rec.sum * 100 : 0, ms: (rec.end || Date.now()) - rec.start, measured: measured };
+      return { area: area, overlap: rec.sum > 0 ? Math.max(0, rec.sum - rec.cells.size) / rec.sum * 100 : 0, ms: (rec.end || Date.now()) - rec.start, measured: measured, turns: rec.turns };
     }
     if (saved) return saved.stats;
     return { area: 0, overlap: 0, ms: 0 };
@@ -477,6 +509,14 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     $('rowPhone').hidden = ant; $('rowAnt').hidden = !ant; $('rowSide').hidden = !ant;
     saveCfg();
   }
+  function setTurnPause(on) {
+    cfg.turnPause = on !== false;
+    $('turnPause').setAttribute('aria-pressed', String(cfg.turnPause));
+    $('turnGo').setAttribute('aria-pressed', String(!cfg.turnPause));
+    saveCfg();
+  }
+  $('turnPause').addEventListener('click', function () { setTurnPause(true); });
+  $('turnGo').addEventListener('click', function () { setTurnPause(false); });
   $('srcPhone').addEventListener('click', function () { setSource('phone'); });
   $('srcAnt').addEventListener('click', function () { setSource('antenna'); });
   KEYS.forEach(function (k) { $(k).addEventListener('input', function (e) { setCfg(k, parseFloat(e.target.value)); }); });
@@ -493,7 +533,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (kmh !== null) { samples.push({ v: kmh, t: t }); samples = samples.filter(function (s) { return t - s.t <= WINDOW_MS; }); }
     if (acc !== null) {
       var accTxt = acc < 1 ? '±' + Math.max(1, Math.round(acc * 100)) + ' cm' + (acc <= 0.1 ? ' · RTK' : '') : '±' + Math.round(acc) + ' m' + (acc > 20 ? ' (schwach)' : '');
-      $('status').innerHTML = '<span class="rec-dot"></span>' + (rec ? 'Aufzeichnung' : 'GPS') + ' · ' + accTxt;
+      $('status').innerHTML = '<span class="rec-dot"></span>' + (rec ? 'Aufzeichnung' : 'GPS') + ' · ' + accTxt + (rec && rec.turning ? ' · Wenden' : '') + (rec && rec.turns ? ' · ' + rec.turns + '× gewendet' : '');
     }
     if (!rec) { render(); return; }
 
@@ -513,11 +553,14 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (dist(p, rec.ref) >= (precise ? 1 : 3)) { rec.heading = Math.atan2(p.x - rec.ref.x, p.y - rec.ref.y); rec.ref = p; }
     if (headingDeg !== null && !isNaN(headingDeg) && kmh !== null && kmh > STAND) h = headingDeg * D;
     else if (rec.heading !== undefined) h = rec.heading;
+    detectTurn(p, h);
 
     var v = speedAvg();
     if (v === null || v <= STAND || h === null) { rec.prevBoom = null; boomLine.setLatLngs([]); render(); return; }
     // mit Durchflussmesser: nur einfärben, wenn tatsächlich Gülle fliesst
     if (flow.connected && (!flowLive() || flow.lmin < MIN_FLOW)) { rec.prevBoom = null; boomLine.setLatLngs([]); render(); return; }
+    // ohne Durchflussmesser: beim Wenden nicht einfärben (abschaltbar)
+    if (!flow.connected && rec.turning && cfg.turnPause) { rec.prevBoom = null; boomLine.setLatLngs([]); render(); return; }
 
     var f = { x: Math.sin(h), y: Math.cos(h) }, r = { x: Math.cos(h), y: -Math.sin(h) };
     // Verteiler-Mitte: hinter dem Positionspunkt (Abstand) und bei der Antenne ggf. seitlich versetzt
@@ -629,16 +672,27 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     var simFlow = !flow.connected;
     if (simFlow) { flow = { device: null, connected: true, fake: true, lmin: 0, total: 0, t: Date.now() }; rec.total0 = 0; }
     var factors = [1, 0.8, 1, 1.25, 1, 1];
+    // Wenden als Halbkreis mit 4 km/h (1 Takt = 1 s Fahrzeit)
+    var TURN_TICKS = Math.max(6, Math.round(Math.PI * cfg.width * 0.95 / 2 / (4 / 3.6)));
     demoTimer = setInterval(function () {
-      var kmh;
-      if (turn > 0) { turn--; kmh = 0.3; if (turn === 0) { lane++; dir = -dir; } }
-      else { along += dir * v; kmh = 7 + (Math.random() - 0.5); if (along > L0 || along < 0) { along = Math.max(0, Math.min(L0, along)); turn = 4; } }
+      var kmh, x, y, w = cfg.width * 0.95;
+      if (turn > 0) {
+        turn--; kmh = 4 + (Math.random() - 0.5) * 0.5;
+        var th = Math.PI * (TURN_TICKS - turn) / TURN_TICKS;
+        x = lane * w + w / 2 - w / 2 * Math.cos(th);
+        y = along + dir * w / 2 * Math.sin(th);
+        if (turn === 0) { lane++; dir = -dir; }
+      } else {
+        along += dir * v; kmh = 7 + (Math.random() - 0.5);
+        if (along > L0 || along < 0) { along = Math.max(0, Math.min(L0, along)); turn = TURN_TICKS; }
+        x = lane * w; y = along;
+      }
       if (simFlow) {
         var q = turn > 0 ? 0 : cfg.rate * 7 * cfg.width / 0.6 * (factors[lane] || 1);
         flow.lmin = q; flow.total += q / 60; flow.t = Date.now();
       }
-      var x = lane * cfg.width * 0.95 + (turn > 0 ? cfg.width * 0.95 * (4 - turn) / 4 : 0) + (Math.random() - 0.5) * 1.2;
-      var y = along + (Math.random() - 0.5) * 1.2;
+      x += (Math.random() - 0.5) * 1.2;
+      y += (Math.random() - 0.5) * 1.2;
       var ll = toLL(o, { x: x, y: y });
       onFix(ll[0], ll[1], kmh, null, Date.now(), 4);
       if (lane > 5) finish();
@@ -670,7 +724,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   function fileBase(d) { return 'guelle-karte-' + d.date.slice(0, 16).replace(/[:T]/g, '-'); }
   function props(d) {
     var measured = d.stats.measured !== null && d.stats.measured !== undefined;
-    return { datum: d.date, flaeche_ha: Number(d.stats.area.toFixed(3)), menge_m3: measured ? Number(d.stats.measured.toFixed(1)) : Math.round(d.stats.area * (d.stats.rate || d.cfg.rate)), menge_quelle: measured ? 'Durchflussmesser' : 'berechnet', ueberlappung_prozent: Math.round(d.stats.overlap), arbeitsbreite_m: d.cfg.width, positionsquelle: d.cfg.source === 'antenna' ? 'Antenne' : 'Handy', abstand_verteiler_m: d.cfg.source === 'antenna' ? d.cfg.aOffset : d.cfg.offset, seitlicher_versatz_m: d.cfg.source === 'antenna' ? d.cfg.aSide : 0, ausbringmenge_m3_ha: d.cfg.rate, parzellen: parcelList(d).map(function (x) { return x.nr; }).join(', ') };
+    return { datum: d.date, flaeche_ha: Number(d.stats.area.toFixed(3)), menge_m3: measured ? Number(d.stats.measured.toFixed(1)) : Math.round(d.stats.area * (d.stats.rate || d.cfg.rate)), menge_quelle: measured ? 'Durchflussmesser' : 'berechnet', ueberlappung_prozent: Math.round(d.stats.overlap), arbeitsbreite_m: d.cfg.width, positionsquelle: d.cfg.source === 'antenna' ? 'Antenne' : 'Handy', abstand_verteiler_m: d.cfg.source === 'antenna' ? d.cfg.aOffset : d.cfg.offset, seitlicher_versatz_m: d.cfg.source === 'antenna' ? d.cfg.aSide : 0, ausbringmenge_m3_ha: d.cfg.rate, wendemanoever: d.stats.turns || 0, parzellen: parcelList(d).map(function (x) { return x.nr; }).join(', ') };
   }
   // Parzellen mit befahrener Fläche, grösste zuerst
   function parcelList(d) {
@@ -702,7 +756,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       var qs = d.quads.filter(function (q, i) { return ((d.colors && d.colors[i]) || YELLOW) === cl.color; });
       if (!qs.length) return;
       styles += '<Style id="f' + n + '"><LineStyle><width>0</width></LineStyle><PolyStyle><color>' + cl.kml + '</color><outline>0</outline></PolyStyle></Style>';
-      marks += '<Placemark><name>' + cl.name + '</name><description>Fläche ' + p.flaeche_ha + ' ha · Menge ' + p.menge_m3 + ' m³ (' + p.menge_quelle + ') · Überlappung ' + p.ueberlappung_prozent + ' % · Arbeitsbreite ' + p.arbeitsbreite_m + ' m · Soll ' + p.ausbringmenge_m3_ha + ' m³/ha' + parcTxt + '</description><styleUrl>#f' + n + '</styleUrl><MultiGeometry>' + qs.map(poly).join('') + '</MultiGeometry></Placemark>';
+      marks += '<Placemark><name>' + cl.name + '</name><description>Fläche ' + p.flaeche_ha + ' ha · Menge ' + p.menge_m3 + ' m³ (' + p.menge_quelle + ') · Überlappung ' + p.ueberlappung_prozent + ' % · Arbeitsbreite ' + p.arbeitsbreite_m + ' m · Soll ' + p.ausbringmenge_m3_ha + ' m³/ha · Wendemanöver ' + p.wendemanoever + parcTxt + '</description><styleUrl>#f' + n + '</styleUrl><MultiGeometry>' + qs.map(poly).join('') + '</MultiGeometry></Placemark>';
     });
     var line = '<LineString><coordinates>' + d.track.map(function (pt) { return pt[1].toFixed(7) + ',' + pt[0].toFixed(7) + ',0'; }).join(' ') + '</coordinates></LineString>';
     var kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Gülle-Karte ' + p.datum.slice(0, 10) + '</name>' + styles +
@@ -717,6 +771,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   try { var c0 = JSON.parse(localStorage.getItem(STORE + '-cfg')); if (c0) cfg = Object.assign(cfg, c0); } catch (e) {}
   KEYS.forEach(function (k) { setCfg(k, cfg[k]); });
   setSource(cfg.source);
+  setTurnPause(cfg.turnPause);
   try {
     saved = JSON.parse(localStorage.getItem(STORE));
     if (saved && saved.quads && saved.quads.length) {
