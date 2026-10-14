@@ -245,7 +245,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   var $ = function (id) { return document.getElementById(id); };
 
   // ---------- Karte ----------
-  var map = L.map('map', { zoomControl: false, preferCanvas: true }).setView([46.8745, 7.7965], 16);
+  var map = L.map('map', { zoomControl: false, preferCanvas: true, zoomSnap: 0.25 }).setView([46.8745, 7.7965], 16);
   L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg', {
     maxZoom: 21, maxNativeZoom: 20, attribution: 'Luftbild © <a href="https://www.swisstopo.admin.ch/">swisstopo</a>'
   }).addTo(map);
@@ -258,12 +258,18 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       var a = L.DomUtil.create('a', 'center-btn', div);
       a.href = '#'; a.title = 'Auf Traktor zentrieren'; a.setAttribute('role', 'button'); a.setAttribute('aria-label', 'Auf Traktor zentrieren');
       a.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>';
-      L.DomEvent.on(a, 'click', function (e) { L.DomEvent.preventDefault(e); follow = true; if (lastLL) map.setView(lastLL, Math.max(map.getZoom(), 17)); });
+      L.DomEvent.on(a, 'click', function (e) { L.DomEvent.preventDefault(e); follow = true; if (lastLL) centerOnTractor(); });
       L.DomEvent.disableClickPropagation(div);
       return div;
     }
   });
   map.addControl(new CenterCtl());
+  // Auf Traktor zentrieren: Ausschnitt etwa 200 m (schmale Seite der Karte)
+  var CENTER_M = 200;
+  function centerOnTractor() {
+    var ll = L.latLng(lastLL);
+    map.setView(ll, map.getBoundsZoom(ll.toBounds(CENTER_M)), { animate: false });
+  }
   map.on('dragstart', function () { follow = false; });
 
   // ---------- Parzellennummer (geo.admin.ch, Layer CadastralWebMap) ----------
