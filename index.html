@@ -58,9 +58,19 @@ nav.tabs a[aria-current]{color:#fff;border-bottom-color:var(--yellow)}
 .rec-dot{display:inline-block;width:9px;height:9px;background:var(--on-dark);margin-right:6px;vertical-align:baseline}
 .rec .rec-dot{background:var(--yellow)}
 .btn{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:56px;padding:16px 22px;border:2px solid var(--yellow);background:var(--yellow);color:var(--dark);font:700 14px/1 Archivo,'Segoe UI',system-ui,sans-serif;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
-.btn.stop{background:#fff;border-color:#fff}
+.btn.stop{background:linear-gradient(var(--yellow),var(--yellow)) left / 0% 100% no-repeat #fff;border-color:#fff;color:var(--dark)}
+.actions{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.actions.two{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.actions.two .btn{padding:16px 12px;font-size:13px;justify-content:center;text-align:center}
+.actions.two .btn svg{display:none}
+.actions .btn{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+.btn.line.spread{min-height:56px;border-color:var(--yellow);color:var(--yellow)}
+.btn.line.spread[aria-pressed="false"]{background:#888780;border-color:#888780;color:var(--dark)}
 .btn.line{background:transparent;color:#fff;border-color:#fff;min-height:48px;padding:12px 16px;font-size:12px}
 .btn:active{background:var(--dark);color:var(--yellow)}
+.btn.stop:active{background:linear-gradient(var(--yellow),var(--yellow)) left / 0% 100% no-repeat #fff;color:var(--dark)}
+.btn.stop.holding,.btn.stop.holding:active{background-size:100% 100%;transition:background-size 1s linear}
+.btn.line.spread:active{background:transparent;color:var(--yellow)}
 .row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .icon-btn{width:44px;height:44px;flex:none;display:grid;place-items:center;border:0;background:#000;color:#fff;cursor:pointer;padding:0}
 .icon-btn svg{width:24px;height:24px}
@@ -159,7 +169,11 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <div class="status" id="statusBar"><span id="status"><span class="rec-dot"></span>Bereit</span><span id="acc">Dauer 00:00</span></div>
 <p class="msg" id="msg" hidden></p>
 
+<div class="actions" id="actions">
+<button class="btn line spread" id="spreadBtn" type="button" hidden aria-pressed="true"><span>Ausbringen ein</span></button>
+<button class="btn" id="resumeBtn" type="button" hidden><span>Fortsetzen</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
 <button class="btn" id="startStop" type="button"><span>Aufzeichnung starten</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
+</div>
 
 </section>
 
@@ -235,9 +249,16 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <button class="btn line" id="dlGeo" type="button">GeoJSON</button>
 <button class="btn line" id="clear" type="button">Neu</button>
 </div>
-<button class="btn line" id="demo" type="button"><span>Demo ohne GPS</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
 <p class="note">Eingefärbt wird die Fläche unter dem Verteiler (Arbeitsbreite, Abstand hinter dem Traktor), nur bei mehr als 0.5 km/h. Handy-GPS liegt oft 3–5 m daneben – kleine Lücken oder Überlappungen auf der Karte sind deshalb normal. Luftbild © swisstopo.</p>
 <p class="note" id="powerInfo">Kartenanzeige Akkubetrieb: 30 Bilder/s.</p>
+</div>
+</section>
+
+<section class="group">
+<h2>Test</h2>
+<div class="set">
+<button class="btn line" id="demo" type="button"><span>Demo ohne GPS</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
+<p class="note">Die Demo fährt simuliert über eine Wiese. Sie verändert keine gespeicherte Karte – nach dem Stoppen ist die letzte echte Karte wieder da.</p>
 </div>
 </section>
 </div>
@@ -389,14 +410,20 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   }
   requestAnimationFrame(frame);
 
-  // Spur als Spline (Catmull-Rom) durch die geglätteten Punkte; neue Stützpunkte erst ab 1 m Abstand
+  // Spur als Spline (Catmull-Rom) durch die geglätteten Punkte; neue Stützpunkte erst ab 1 m Abstand.
+  // trackDraw besteht aus Abschnitten – nach «Fortsetzen» beginnt ein neuer, ohne Verbindungslinie.
   var SPL_STEPS = 6, splineTail = null;
+  function trackRing() { var rings = trackLine.getLatLngs(); return rings[rings.length - 1]; }
   function splineAdd(r, p) {
     if (!r.spl) r.spl = [];
     var last = r.spl[r.spl.length - 1];
     if (last && dist(last, p) < 1) return;
     r.spl.push(p);
-    if (r.spl.length === 1) { r.splLast = L.latLng(toLL(r.origin, p)); r.trackDraw = [toLL(r.origin, p)]; trackLine.setLatLngs(r.trackDraw); return; }
+    if (r.spl.length === 1) {
+      var ll0 = toLL(r.origin, p);
+      r.splLast = L.latLng(ll0); r.trackDraw.push([ll0]); trackLine.setLatLngs(r.trackDraw);
+      return;
+    }
     if (r.spl.length < 4) return;
     if (r.spl.length > 4) r.spl.shift();
     var p0 = r.spl[0], p1 = r.spl[1], p2 = r.spl[2], p3 = r.spl[3];
@@ -406,10 +433,12 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       var x = 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
       var y = 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
       var ll = toLL(r.origin, { x: x, y: y });
-      r.trackDraw.push(ll); trackLine.addLatLng(ll);
+      r.trackDraw[r.trackDraw.length - 1].push(ll); trackLine.addLatLng(ll, trackRing());
     }
-    r.splLast = L.latLng(r.trackDraw[r.trackDraw.length - 1]);
+    r.splLast = L.latLng(ll);
   }
+  // ältere Karten speichern die Spur als einfache Liste – in Abschnitte umwandeln
+  function normTrack(t) { return !t || !t.length ? [] : typeof t[0][0] === 'number' ? [t] : t; }
 
   function followCenter() {
     var c = detail ? detailCenter() : disp.ll;
@@ -549,10 +578,10 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     }
     // Tempo-Ansicht (grosse Anzeige)
     $('ist').textContent = v === null || v <= STAND ? '–' : v.toFixed(1);
-    var turning = !!(rec && rec.turning);
-    $('sollLine').textContent = 'Soll ' + s.v.toFixed(1) + ' km/h · ±' + TOL + (s.flow ? ' · aus Durchfluss' : '') + (turning ? ' · Wenden' : '');
-    // beim Wenden wie auf der Karte kein Pfeil
-    var big = !!(st && st !== 'ok' && !turning);
+    var turning = !!(rec && rec.turning), off = !!(rec && rec.spreadOff);
+    $('sollLine').textContent = 'Soll ' + s.v.toFixed(1) + ' km/h · ±' + TOL + (s.flow ? ' · aus Durchfluss' : '') + (turning ? ' · Wenden' : '') + (off ? ' · Ausbringen aus' : '');
+    // beim Wenden und bei «Ausbringen aus» wie auf der Karte kein Pfeil
+    var big = !!(st && st !== 'ok' && !turning && !off);
     $('arrow').hidden = !big;
     if (big) { $('arrowSvg').innerHTML = ARROW[st]; $('arrowTxt').textContent = { up: 'Schneller', down: 'Langsamer', stop: 'Stillstand' }[st]; }
     renderTractor(v, st, turning);
@@ -582,7 +611,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (!standing) tractor.setRadius(7);
     // Ring nur bei laufender Aufzeichnung oder Tempo-Messung
     var dir = null, iv = 0;
-    if ((rec || tempoOnly) && !stale && !turning && (st === 'up' || st === 'down')) {
+    if ((rec || tempoOnly) && !stale && !turning && !(rec && rec.spreadOff) && (st === 'up' || st === 'down')) {
       if (ring.st !== st) { ring.st = st; ring.since = Date.now(); }
       if (Date.now() - ring.since >= RING_DELAY) {
         dir = st === 'down' ? 'in' : 'out';
@@ -630,7 +659,12 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     var lmin = parseFloat(parts[0]), total = parseFloat(parts[1]);
     if (isNaN(lmin) || isNaN(total)) return;
     flow.lmin = Math.max(0, lmin); flow.total = total; flow.t = Date.now();
-    if (rec && rec.total0 === null) rec.total0 = total;
+    // Liter als Zunahmen aufsummieren: startet das Modul neu (Traktor abgestellt), beginnt sein Zähler
+    // wieder bei 0 – dann zählt der neue Stand ab 0, statt die Menge zu verfälschen.
+    if (rec) {
+      if (rec.lastTotal !== null) { var d = total - rec.lastTotal; rec.liters += d >= 0 ? d : total; }
+      rec.lastTotal = total; rec.flowSeen = true;
+    }
     render();
   }
   function setFlowBtn(text) { $('flowBtn').firstElementChild.textContent = text; }
@@ -644,7 +678,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
         chr.addEventListener('characteristicvaluechanged', function (e) { onFlowValue(new TextDecoder().decode(e.target.value)); });
         return chr.startNotifications();
       })
-      .then(function () { flow.connected = true; setFlowBtn('Durchflussmesser verbunden ✓'); showMsg(''); render(); });
+      .then(function () { flow.connected = true; if (rec) rec.spreadOff = false; setFlowBtn('Durchflussmesser verbunden ✓'); showMsg(''); render(); });
   }
   $('flowBtn').addEventListener('click', function () {
     if (flow.connected && flow.device) { flow.connected = false; flow.device.gatt.disconnect(); return; }
@@ -682,7 +716,10 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   var rec = null, saved = null, watchId = null, demoTimer = null, wakeLock = null, follow = true, lastLL = null, lastFixAt = 0, samples = [], clockTimer = null;
 
   function newRec() {
-    return { origin: null, prevBoom: null, ref: null, quads: [], colors: [], track: [], cells: new Set(), sum: 0, parcels: {}, start: Date.now(), end: null, total0: null, odo: 0, lastP: null, hist: [], curve: null, turning: false, turns: 0 };
+    var now = Date.now();
+    return { origin: null, prevBoom: null, ref: null, quads: [], colors: [], track: [], trackDraw: [], cells: new Set(), sum: 0, parcels: {},
+      start: now, segStart: now, msBefore: 0, end: null, liters: 0, lastTotal: null, flowSeen: false,
+      odo: 0, lastP: null, hist: [], curve: null, turning: false, turns: 0, spreadOff: false };
   }
 
   // ---------- Wendemanöver erkennen ----------
@@ -745,8 +782,10 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   function stats() {
     if (rec) {
       var area = rec.cells.size / 10000;
-      var measured = rec.total0 !== null && flow.total !== null ? Math.max(0, flow.total - rec.total0) / 1000 : null;
-      return { area: area, overlap: rec.sum > 0 ? Math.max(0, rec.sum - rec.cells.size) / rec.sum * 100 : 0, ms: (rec.end || Date.now()) - rec.start, measured: measured, turns: rec.turns };
+      var measured = rec.flowSeen ? rec.liters / 1000 : null;
+      // Dauer ohne die Zeit zwischen Stopp und Fortsetzen
+      var ms = rec.msBefore + (rec.end || Date.now()) - rec.segStart;
+      return { area: area, overlap: rec.sum > 0 ? Math.max(0, rec.sum - rec.cells.size) / rec.sum * 100 : 0, ms: ms, measured: measured, turns: rec.turns };
     }
     if (saved) return saved.stats;
     return { area: 0, overlap: 0, ms: 0 };
@@ -761,6 +800,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     var amount = st.measured !== null && st.measured !== undefined ? st.measured : st.area * (st.rate || cfg.rate);
     $('sAmount').innerHTML = Math.round(amount) + '<small>m³</small>';
     $('sOverlap').innerHTML = Math.round(st.overlap) + '<small>%</small>';
+    updateActions();
     $('acc').textContent = 'Dauer ' + mmss(st.ms);
     var showFlow = flow.connected || (st.measured !== null && st.measured !== undefined);
     $('flowStats').hidden = !showFlow; $('legend').hidden = !showFlow;
@@ -772,7 +812,13 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     }
   }
   function setStatus(text, recording) { $('status').innerHTML = '<span class="rec-dot"></span>' + text; $('statusBar').className = 'status' + (recording ? ' rec' : ''); }
-  function showMsg(t) { $('msg').textContent = t; $('msg').hidden = !t; if (t) closeMenu(); }
+  // kind 'gps': verschwindet von selbst, sobald wieder eine Position kommt, und schliesst das Menü nicht
+  var msgKind = null;
+  function showMsg(t, kind) {
+    $('msg').textContent = t; $('msg').hidden = !t;
+    msgKind = t ? (kind || 'ui') : null;
+    if (t && kind !== 'gps') closeMenu();
+  }
 
   // ---------- Ansicht Tempo / Karte (eine Seite: GPS, Aufzeichnung und Bluetooth laufen beim Wechseln weiter) ----------
   function setView(v) {
@@ -838,12 +884,13 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   // ---------- GPS-Punkt verarbeiten ----------
   function onFix(lat, lon, kmh, headingDeg, t, acc) {
     lastLL = [lat, lon]; lastFixAt = Date.now();
+    if (msgKind === 'gps') showMsg('');          // GPS läuft wieder: alte GPS-Meldung weg
     if (!map.hasLayer(tractor)) tractor.addTo(map);
     if (kmh !== null) { samples.push({ v: kmh, t: t }); samples = samples.filter(function (s) { return t - s.t <= WINDOW_MS; }); }
     rotFeed(lat, lon, kmh, headingDeg);
-    if (acc !== null) {
+    if (acc !== null && Date.now() > statusHoldUntil) {   // ein Hinweis bleibt kurz stehen
       var accTxt = acc < 1 ? '±' + Math.max(1, Math.round(acc * 100)) + ' cm' + (acc <= 0.1 ? ' · RTK' : '') : '±' + Math.round(acc) + ' m' + (acc > 20 ? ' (schwach)' : '');
-      $('status').innerHTML = '<span class="rec-dot"></span>' + (rec ? 'Aufzeichnung' : 'GPS') + ' · ' + accTxt + (rec && rec.turning ? ' · Wenden' : '') + (rec && rec.turns ? ' · ' + rec.turns + '× gewendet' : '');
+      $('status').innerHTML = '<span class="rec-dot"></span>' + (rec ? 'Aufzeichnung' : 'GPS') + ' · ' + accTxt + (rec && rec.spreadOff ? ' · Ausbringen aus' : '') + (rec && rec.turning ? ' · Wenden' : '') + (rec && rec.turns ? ' · ' + rec.turns + '× gewendet' : '');
     }
     if (!rec) { moveTo(L.latLng(lastLL)); render(); return; }
 
@@ -868,6 +915,8 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 
     var v = speedAvg();
     if (v === null || v <= STAND || h === null) { rec.prevBoom = null; boomTo(null); render(); return; }
+    // «Ausbringen aus» (z. B. Fahrt zur Güllegrube): nichts einfärben
+    if (rec.spreadOff) { rec.prevBoom = null; boomTo(null); render(); return; }
     // mit Durchflussmesser: nur einfärben, wenn tatsächlich Gülle fliesst
     if (flow.connected && (!flowLive() || flow.lmin < MIN_FLOW)) { rec.prevBoom = null; boomTo(null); render(); return; }
     // ohne Durchflussmesser: beim Wenden nicht einfärben (abschaltbar)
@@ -930,7 +979,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       onFix(c.latitude, c.longitude, kmh, c.heading, pos.timestamp || Date.now(), c.accuracy);
     }, function (e) {
       var t = { 1: 'Standort-Zugriff wurde abgelehnt. Bitte in den Browser-Einstellungen erlauben.', 2: 'Kein GPS-Signal. Handy näher an die Scheibe halten.', 3: 'GPS antwortet nicht (Zeitüberschreitung).' };
-      showMsg(t[e.code] || 'GPS-Fehler: ' + e.message);
+      showMsg(t[e.code] || 'GPS-Fehler: ' + e.message, 'gps');
     }, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
   }
   function stopGps() {
@@ -953,51 +1002,166 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (gpsCheck()) { showMsg(''); setTempoOnly(true); }
   });
 
-  function begin() {
-    if (saved && !confirm('Die gespeicherte Karte wird ersetzt. Neue Aufzeichnung starten?')) return false;
+  // ---------- Speichern: beim Stoppen, alle 30 s während der Aufzeichnung und wenn die App in den Hintergrund geht ----------
+  // So geht bei einem Absturz, Anruf oder leerem Akku höchstens eine halbe Minute verloren.
+  var AUTOSAVE_MS = 30000, autosaveTimer = null, autosaveWarned = false, demoBackup = null;
+  function snapshot(open) {
+    var st = stats(); st.rate = cfg.rate;
+    return { open: open, quads: rec.quads, colors: rec.colors, track: rec.track, trackDraw: rec.trackDraw, parcels: rec.parcels,
+      origin: rec.origin, sum: rec.sum, turns: rec.turns, liters: rec.liters, flowSeen: rec.flowSeen, msTotal: st.ms, start: rec.start,
+      stats: st, cfg: JSON.parse(JSON.stringify(cfg)), date: new Date(rec.start).toISOString() };
+  }
+  function persist(obj) { try { localStorage.setItem(STORE, JSON.stringify(obj)); return true; } catch (e) { return false; } }
+  function autosave() {
+    if (!rec || demoTimer || !rec.quads.length) return;
+    if (!persist(snapshot(true)) && !autosaveWarned) {
+      autosaveWarned = true;
+      showMsg('Zwischenspeichern nicht möglich (Speicher voll?). Bitte die Karte zwischendurch herunterladen.', 'gps');
+    }
+  }
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') autosave(); });
+  window.addEventListener('pagehide', autosave);
+
+  // gespeicherte Karte wieder zu einer laufenden Aufzeichnung machen (Fortsetzen)
+  function restoreRec(s) {
+    var r = newRec();
+    r.quads = s.quads || []; r.colors = s.colors || []; r.track = s.track || [];
+    r.trackDraw = normTrack(s.trackDraw || s.track); r.parcels = s.parcels || {};
+    r.origin = s.origin || (r.quads.length ? { lat: r.quads[0][0][0], lon: r.quads[0][0][1] } : null);
+    r.turns = s.turns || (s.stats && s.stats.turns) || 0;
+    r.flowSeen = !!(s.flowSeen || (s.stats && s.stats.measured !== null && s.stats.measured !== undefined));
+    r.liters = typeof s.liters === 'number' ? s.liters : r.flowSeen ? s.stats.measured * 1000 : 0;
+    r.start = s.start || Date.parse(s.date) || Date.now();
+    r.msBefore = typeof s.msTotal === 'number' ? s.msTotal : (s.stats && s.stats.ms) || 0;
+    r.segStart = Date.now();
+    // Fläche und Überlappung aus den Streifen neu berechnen
+    if (r.origin) r.quads.forEach(function (q) {
+      var xy = q.map(function (pt) { return toXY(r.origin, pt[0], pt[1]); });
+      if (typeof s.sum !== 'number') r.sum += shoelace(xy);
+      rasterize(r, xy);
+    });
+    if (typeof s.sum === 'number') r.sum = s.sum;
+    return r;
+  }
+  function drawSaved(s, fit) {
+    coverLayer.clearLayers();
+    s.quads.forEach(function (q, i) { L.polygon(q, coverStyle(s.colors && s.colors[i])).addTo(coverLayer); });
+    trackLine.setLatLngs(normTrack(s.trackDraw || s.track));
+    if (fit && s.track && s.track.length) { map.fitBounds(L.latLngBounds(s.track), { padding: [20, 20] }); follow = false; }
+  }
+
+  // ---------- Tasten unten: Ausbringen ein/aus · Fortsetzen · Start/Stopp ----------
+  function setLabel(el, t) { if (el.firstElementChild.textContent !== t) el.firstElementChild.textContent = t; }
+  function updateActions() {
+    var recording = !!rec, canResume = !rec && !!saved && !demoTimer;
+    var showSpread = recording && (!flow.connected || !!flow.fake);   // mit Durchflussmesser entscheidet der Durchfluss
+    $('spreadBtn').hidden = !showSpread;
+    if (showSpread) {
+      $('spreadBtn').setAttribute('aria-pressed', String(!rec.spreadOff));
+      setLabel($('spreadBtn'), rec.spreadOff ? 'Ausbringen aus' : 'Ausbringen ein');
+    }
+    $('resumeBtn').hidden = !canResume;
+    var ss = $('startStop');
+    ss.classList.toggle('stop', recording);
+    ss.classList.toggle('line', !recording && canResume);
+    setLabel(ss, recording ? (demoTimer ? 'Demo stoppen · halten' : 'Stopp · halten') : canResume ? 'Neu starten' : 'Aufzeichnung starten');
+    $('actions').classList.toggle('two', showSpread || canResume);
+  }
+  $('spreadBtn').addEventListener('click', function () {
+    if (!rec) return;
+    rec.spreadOff = !rec.spreadOff;
+    updateActions(); render();
+  });
+
+  function startRecUI() {
+    keepAwake();
+    clearInterval(clockTimer); clockTimer = setInterval(render, 1000);
+    clearInterval(autosaveTimer); autosaveTimer = setInterval(autosave, AUTOSAVE_MS);
+    $('gpsOnly').hidden = true;
+    setStatus('Aufzeichnung', true);
+    follow = true;
+    updateActions();
+  }
+  function begin(isDemo) {
+    if (!isDemo && saved && !confirm('Die gespeicherte Karte wird ersetzt. Neue Aufzeichnung starten?\n\nTipp: «Fortsetzen» macht auf der bestehenden Karte weiter.')) return false;
+    if (isDemo) demoBackup = saved;          // echte Karte während der Demo aufbewahren
     coverLayer.clearLayers(); trackLine.setLatLngs([]); boomTo(null);
     saved = null; samples = [];
     rec = newRec();
-    if (flow.total !== null) rec.total0 = flow.total;
-    keepAwake();
-    clockTimer = setInterval(render, 1000);
-    $('gpsOnly').hidden = true;
-    $('startStop').className = 'btn stop';
-    $('startStop').firstElementChild.textContent = 'Aufzeichnung stoppen';
-    setStatus('Aufzeichnung', true);
-    follow = true;
+    rec.lastTotal = flow.total;              // Liter erst ab jetzt zählen
+    startRecUI();
     return true;
   }
+  function resume() {
+    if (!saved || rec || !gpsCheck()) return;
+    var keep = tempoOnly ? samples : null;
+    rec = restoreRec(saved);
+    rec.lastTotal = flow.total;              // was zwischen Stopp und Fortsetzen floss, nicht mitzählen
+    saved = null; samples = keep || [];
+    startRecUI();
+    persist(snapshot(true));
+    showMsg('');
+    setStatus('GPS sucht …', true);
+    startGps();
+  }
+  $('resumeBtn').addEventListener('click', resume);
 
   function finish() {
-    var wasDemo = !!demoTimer;
+    var wasDemo = !!demoTimer, stored = true;
     if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
     if (!tempoOnly || wasDemo) stopGps();
-    if (clockTimer) { clearInterval(clockTimer); clockTimer = null; }
+    clearInterval(clockTimer); clockTimer = null;
+    clearInterval(autosaveTimer); autosaveTimer = null;
     if (wakeLock && !tempoOnly) { wakeLock.release().catch(function () {}); wakeLock = null; }
     if (rec) {
       rec.end = Date.now();
-      var st = stats(); st.rate = cfg.rate;
       // angezeigte Spline-Spur bis zum letzten Punkt abschliessen
-      if (rec.trackDraw && rec.sp) { rec.trackDraw.push(toLL(rec.origin, rec.sp)); trackLine.setLatLngs(rec.trackDraw); }
-      saved = { quads: rec.quads, colors: rec.colors, track: rec.track, trackDraw: rec.trackDraw, parcels: rec.parcels, stats: st, cfg: JSON.parse(JSON.stringify(cfg)), date: new Date(rec.start).toISOString() };
-      var stored = true;
-      try { localStorage.setItem(STORE, JSON.stringify(saved)); } catch (e) { stored = false; showMsg('Karte konnte auf diesem Gerät nicht gespeichert werden. Bitte herunterladen.'); }
+      var seg = rec.trackDraw[rec.trackDraw.length - 1];
+      if (seg && rec.sp) { seg.push(toLL(rec.origin, rec.sp)); trackLine.setLatLngs(rec.trackDraw); }
+      var snap = snapshot(false);
       rec = null;
+      if (wasDemo) {
+        // Demo: nichts speichern, die echte Karte wieder anzeigen
+        saved = demoBackup; demoBackup = null;
+        coverLayer.clearLayers(); trackLine.setLatLngs([]);
+        if (saved) drawSaved(saved, false);
+      } else if (snap.quads.length || snap.track.length) {
+        saved = snap; stored = persist(snap);
+        if (!stored) showMsg('Karte konnte auf diesem Gerät nicht gespeichert werden. Bitte herunterladen.');
+      }
     }
     boomTo(null);
     if (!tempoOnly) samples = [];
     $('gpsOnly').hidden = false;
-    $('startStop').className = 'btn';
-    $('startStop').firstElementChild.textContent = 'Aufzeichnung starten';
     $('demo').firstElementChild.textContent = 'Demo ohne GPS';
-    setStatus(stored === false ? 'Gestoppt · nicht gespeichert' : 'Gestoppt · gespeichert', false);
+    setStatus(wasDemo ? 'Demo beendet' : stored === false ? 'Gestoppt · nicht gespeichert' : 'Gestoppt · gespeichert', false);
     if (flow.fake) flow = { device: null, connected: false, lmin: null, total: null, t: 0 };
+    updateActions();
     render();
   }
 
-  $('startStop').addEventListener('click', function () {
-    if (rec) { finish(); return; }
+  // Stoppen nur mit 1 s gedrückt halten – ein Holpern auf dem Feld beendet die Aufzeichnung nicht
+  var HOLD_MS = 1000, holdTimer = null, holdDone = false, statusHoldUntil = 0;
+  function holdCancel() {
+    if (!holdTimer) return;
+    clearTimeout(holdTimer); holdTimer = null;
+    $('startStop').classList.remove('holding');
+  }
+  $('startStop').addEventListener('pointerdown', function () {
+    if (!rec) return;
+    $('startStop').classList.add('holding');
+    holdTimer = setTimeout(function () { holdTimer = null; holdDone = true; $('startStop').classList.remove('holding'); finish(); }, HOLD_MS);
+  });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { $('startStop').addEventListener(ev, holdCancel); });
+  $('startStop').addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  $('startStop').addEventListener('click', function (e) {
+    if (holdDone) { holdDone = false; return; }            // Klick nach dem Halten nicht als «Neu starten» werten
+    if (rec) {
+      // Tastatur (kein Zeiger): mit Rückfrage; Finger: Hinweis aufs Halten
+      if (e.detail === 0) { if (confirm('Aufzeichnung stoppen?')) finish(); }
+      else { setStatus('Zum Stoppen 1 Sekunde gedrückt halten', true); statusHoldUntil = Date.now() + 2500; }
+      return;
+    }
     if (!gpsCheck()) return;
     var keep = tempoOnly ? samples : null;
     if (!begin()) return;
@@ -1012,15 +1176,15 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   // ---------- Demo: Hin- und Herfahren auf einer Wiese ----------
   $('demo').addEventListener('click', function () {
     if (demoTimer) { finish(); return; }
+    if (rec) { showMsg('Die Demo geht erst, wenn die Aufzeichnung gestoppt ist.'); return; }
     if (tempoOnly) setTempoOnly(false);
-    if (rec) finish();
-    if (!begin()) return;
-    $('demo').firstElementChild.textContent = 'Demo stoppen';
-    setStatus('Demo (simuliert)', true);
-    var o = { lat: 46.8728, lon: 7.8005 }, lane = 0, along = 0, dir = 1, turn = 0, L0 = 160, v = 7 / 3.6;
     // ohne echten Durchflussmesser: Durchfluss simulieren (Bahn 2 zu wenig, Bahn 4 zu viel)
     var simFlow = !flow.connected;
-    if (simFlow) { flow = { device: null, connected: true, fake: true, lmin: 0, total: 0, t: Date.now() }; rec.total0 = 0; }
+    if (simFlow) flow = { device: null, connected: true, fake: true, lmin: 0, total: 0, t: Date.now() };
+    begin(true);
+    $('demo').firstElementChild.textContent = 'Demo stoppen';
+    setStatus('Demo (simuliert)', true);
+    var o = { lat: 46.8728, lon: 7.8005 }, lane = 0, along = 0, dir = 1, turn = 0, L0 = 160, v = 7 / 3.6, simTotal = 0;
     var factors = [1, 0.8, 1, 1.25, 1, 1];
     // Wenden als Halbkreis mit 4 km/h (1 Takt = 1 s Fahrzeit)
     var TURN_TICKS = Math.max(6, Math.round(Math.PI * cfg.width * 0.95 / 2 / (4 / 3.6)));
@@ -1039,7 +1203,8 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       }
       if (simFlow) {
         var q = turn > 0 ? 0 : cfg.rate * 7 * cfg.width / 0.6 * (factors[lane] || 1);
-        flow.lmin = q; flow.total += q / 60; flow.t = Date.now();
+        simTotal += q / 60;
+        onFlowValue(q + ';' + simTotal);       // wie eine Meldung vom Modul
       }
       x += (Math.random() - 0.5) * 1.2;
       y += (Math.random() - 0.5) * 1.2;
@@ -1057,6 +1222,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     saved = null;
     try { localStorage.removeItem(STORE); } catch (e) {}
     setStatus('Bereit', false);
+    updateActions();
     render();
   });
 
@@ -1071,7 +1237,11 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
   }
-  function fileBase(d) { return 'guelle-karte-' + d.date.slice(0, 16).replace(/[:T]/g, '-'); }
+  // Dateiname mit Schweizer Ortszeit (nicht UTC)
+  function fileBase(d) {
+    var t = new Date(d.date), p = function (n) { return String(n).padStart(2, '0'); };
+    return 'guelle-karte-' + t.getFullYear() + '-' + p(t.getMonth() + 1) + '-' + p(t.getDate()) + '-' + p(t.getHours()) + '-' + p(t.getMinutes());
+  }
   function props(d) {
     var measured = d.stats.measured !== null && d.stats.measured !== undefined;
     return { datum: d.date, flaeche_ha: Number(d.stats.area.toFixed(3)), menge_m3: measured ? Number(d.stats.measured.toFixed(1)) : Math.round(d.stats.area * (d.stats.rate || d.cfg.rate)), menge_quelle: measured ? 'Durchflussmesser' : 'berechnet', ueberlappung_prozent: Math.round(d.stats.overlap), arbeitsbreite_m: d.cfg.width, positionsquelle: d.cfg.source === 'antenna' ? 'Antenne' : 'Handy', abstand_verteiler_m: d.cfg.source === 'antenna' ? d.cfg.aOffset : d.cfg.offset, seitlicher_versatz_m: d.cfg.source === 'antenna' ? d.cfg.aSide : 0, ausbringmenge_m3_ha: d.cfg.rate, wendemanoever: d.stats.turns || 0, parzellen: parcelList(d).map(function (x) { return x.nr; }).join(', ') };
@@ -1128,13 +1298,12 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   try {
     saved = JSON.parse(localStorage.getItem(STORE));
     if (saved && saved.quads && saved.quads.length) {
-      saved.quads.forEach(function (q, i) { L.polygon(q, coverStyle(saved.colors && saved.colors[i])).addTo(coverLayer); });
-      trackLine.setLatLngs(saved.trackDraw || saved.track);
-      map.fitBounds(L.latLngBounds(saved.track), { padding: [20, 20] });
-      follow = false;
-      setStatus('Letzte Karte vom ' + new Date(saved.date).toLocaleDateString('de-CH'), false);
+      drawSaved(saved, true);
+      // open = beim letzten Mal nicht gestoppt (App geschlossen, Absturz, Akku leer)
+      setStatus(saved.open ? 'Aufzeichnung wurde unterbrochen – «Fortsetzen» macht weiter' : 'Letzte Karte vom ' + new Date(saved.date).toLocaleDateString('de-CH'), !!saved.open);
     } else saved = null;
   } catch (e) { saved = null; }
+  updateActions();
   render();
 })();
 </script>
