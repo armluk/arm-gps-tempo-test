@@ -37,9 +37,10 @@ nav.tabs a[aria-current]{color:#fff;border-bottom-color:var(--yellow)}
 .parcel small{font-size:9px;font-weight:700;color:var(--on-dark)}
 .speedbox{border-left:0;border-right:3px solid var(--yellow)}
 .speedbox em{font-style:normal;font-size:9px;font-weight:700;color:var(--on-dark)}
-.tr-arrow{background:none;border:0}
-.tr-arrow svg{display:block;width:30px;height:30px;overflow:visible}
-.panel{flex:none;background:var(--dark);padding:12px 16px 16px;display:flex;flex-direction:column;gap:12px}
+.sonar{background:none;border:0;pointer-events:none}
+.sonar i{position:absolute;inset:0;border-radius:50%;border:3px solid #FFF005;box-shadow:0 0 0 2px rgba(0,0,0,.55),inset 0 0 0 2px rgba(0,0,0,.55);opacity:0}
+@keyframes sonar-out{0%{transform:scale(1);opacity:.95}100%{transform:scale(3.6);opacity:0}}
+@keyframes sonar-in{0%{transform:scale(3.6);opacity:0}100%{transform:scale(1);opacity:.95}}.panel{flex:none;background:var(--dark);padding:12px 16px 16px;display:flex;flex-direction:column;gap:12px}
 .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--fuge);border:1px solid var(--fuge)}
 .stat{background:var(--surface);padding:10px 8px;display:flex;flex-direction:column;gap:4px}
 .stat b{font-size:20px;font-weight:900;line-height:1}
@@ -175,7 +176,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <div class="set-row">
 <div class="set-head"><label for="speed">Soll-Geschwindigkeit</label><output id="speedOut">6.0 km/h</output></div>
 <div class="ctrl"><button class="step" type="button" data-k="speed" data-d="-1" aria-label="Soll-Geschwindigkeit um 0.5 km/h verringern">−</button><input id="speed" type="range" min="0" max="15" step="0.5" value="6"><button class="step" type="button" data-k="speed" data-d="1" aria-label="Soll-Geschwindigkeit um 0.5 km/h erhöhen">+</button></div>
-<p class="note">Mit verbundenem Durchflussmesser wird die Soll-Geschwindigkeit aus Durchfluss, Ausbringmenge und Arbeitsbreite berechnet. Pfeil neben dem Traktor: hoch = schneller, runter = langsamer, «=» = Stillstand, kein Pfeil = im Bereich ±0.5 km/h oder beim Wenden.</p>
+<p class="note">Mit verbundenem Durchflussmesser wird die Soll-Geschwindigkeit aus Durchfluss, Ausbringmenge und Arbeitsbreite berechnet. Traktor-Punkt auf der Karte: Ring läuft nach innen = zu schnell, nach aussen = zu langsam, je öfter, desto grösser die Abweichung. Gelb ohne Ring = im Bereich ±0.5 km/h. Grau = Wenden, grau und gross = Stillstand, hohl = kein GPS.</p>
 </div>
 <div class="set-row">
 <div class="set-head"><span class="lbl" id="turnLbl">Beim Wenden</span></div>
@@ -303,7 +304,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   var YELLOW = '#FFF005', LOW = '#FFFFFF', HIGH = '#C62828';
   function coverStyle(color) { return { stroke: false, fillColor: color || YELLOW, fillOpacity: 0.45, interactive: false }; }
 
-  // ---------- Ist-Geschwindigkeit: Feld unten rechts und Pfeil neben dem Traktor ----------
+  // ---------- Ist-Geschwindigkeit: Feld unten rechts und grosse Anzeige in der Tempo-Ansicht ----------
   var TOL = 0.5;
   var ARROW = {
     up: '<path d="M12 20V5"/><path d="M5 11l7-7 7 7"/>',
@@ -315,9 +316,6 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     onAdd: function () { var d = L.DomUtil.create('div', 'parcel speedbox'); d.setAttribute('aria-live', 'polite'); d.hidden = true; return d; }
   });
   var speedBox = new SpeedCtl().addTo(map).getContainer();
-  var arrowMark = L.marker([0, 0], { interactive: false, keyboard: false, zIndexOffset: 1000,
-    icon: L.divIcon({ className: 'tr-arrow', html: '', iconSize: [30, 30], iconAnchor: [-12, 15] }) });
-  var arrowState = null;
   // Soll: aus dem Durchfluss (Tempo, bei dem die Ist-Menge der Ausbringmenge entspricht), sonst Einstellung
   function sollSpeed() {
     if (flowLive() && flow.lmin >= MIN_FLOW && cfg.rate > 0 && cfg.width > 0) return { v: flow.lmin * 0.6 / (cfg.rate * cfg.width), flow: true };
@@ -344,19 +342,46 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     var big = !!(st && st !== 'ok' && !turning);
     $('arrow').hidden = !big;
     if (big) { $('arrowSvg').innerHTML = ARROW[st]; $('arrowTxt').textContent = { up: 'Schneller', down: 'Langsamer', stop: 'Stillstand' }[st]; }
-    // Pfeil neben dem Traktor nur während der Aufzeichnung
-    // beim Wenden kein Pfeil und kein «=»
-    var show = !!(rec && lastLL && st && st !== 'ok' && !rec.turning);
-    if (!show) { if (map.hasLayer(arrowMark)) arrowMark.remove(); arrowState = null; return; }
-    arrowMark.setLatLng(lastLL);
-    if (!map.hasLayer(arrowMark)) arrowMark.addTo(map);
-    if (arrowState !== st) {
-      arrowState = st;
-      // gelb mit schwarzem Rand, damit er auf dem Luftbild gut sichtbar ist
-      arrowMark.setIcon(L.divIcon({ className: 'tr-arrow', iconSize: [30, 30], iconAnchor: [-12, 15],
-        html: '<svg viewBox="0 0 24 24" fill="none" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><g stroke="#000" stroke-width="5.5">' + ARROW[st] + '</g><g stroke="#FFF005" stroke-width="2.5">' + ARROW[st] + '</g></svg>' }));
-    }
+    renderTractor(v, st, turning);
   }
+
+  // ---------- Traktor-Punkt mit Sonar-Ring ----------
+  // zu schnell: Ring läuft nach innen · zu langsam: Ring läuft nach aussen
+  // je grösser die Abweichung, desto öfter (alle 2 s … 0.5 s), erst nach 2 s ausserhalb der Toleranz
+  // Stillstand: grau und gross · Wenden: grau · im Soll: gelb ohne Ring · kein GPS seit 5 s: hohl
+  var RING_DELAY = 2000, GPS_STALE = 5000;
+  var ringMark = L.marker([0, 0], { interactive: false, keyboard: false, zIndexOffset: -100,
+    icon: L.divIcon({ className: 'sonar', iconSize: [24, 24], iconAnchor: [12, 12], html: '<i></i><i></i>' }) });
+  var ring = { key: '', st: null, since: 0 };
+  function ringInterval(dev) { return Math.max(0.5, Math.min(2, 2 - (Math.abs(dev) - TOL) * 0.6)); }
+  function renderTractor(v, st, turning) {
+    if (!lastLL) return;
+    var stale = Date.now() - lastFixAt > GPS_STALE && !demoTimer;
+    var grey = st === 'stop' || turning;
+    tractor.setStyle({ fillColor: grey ? '#888780' : YELLOW, fillOpacity: stale ? 0 : 1 });
+    tractor.setRadius(st === 'stop' && !stale ? 12 : 7);
+    // Ring nur bei laufender Aufzeichnung oder Tempo-Messung
+    var dir = null, iv = 0;
+    if ((rec || tempoOnly) && !stale && !turning && (st === 'up' || st === 'down')) {
+      if (ring.st !== st) { ring.st = st; ring.since = Date.now(); }
+      if (Date.now() - ring.since >= RING_DELAY) {
+        dir = st === 'down' ? 'in' : 'out';
+        iv = Math.round(ringInterval(v - sollSpeed().v) * 4) / 4;   // in 0.25-s-Stufen, damit es nicht flackert
+      }
+    } else ring.st = null;
+    var key = dir ? dir + iv : '';
+    if (!dir) { if (map.hasLayer(ringMark)) ringMark.remove(); ring.key = ''; return; }
+    ringMark.setLatLng(lastLL);
+    if (!map.hasLayer(ringMark)) ringMark.addTo(map);
+    if (key === ring.key) return;
+    ring.key = key;
+    var rings = ringMark.getElement().querySelectorAll('i');
+    Array.prototype.forEach.call(rings, function (r, i) {
+      r.style.animation = 'none'; void r.offsetWidth;
+      r.style.animation = 'sonar-' + dir + ' ' + (iv * 2) + 's linear ' + (i * iv) + 's infinite';
+    });
+  }
+  setInterval(function () { if (lastLL) render(); }, 1000);   // Ring-Verzögerung und GPS-Ausfall auch ohne neue Position
 
   // ---------- Durchflussmesser (Bluetooth LE, ESP32) ----------
   var FLOW_SVC = '6b1f0001-4a3b-4d52-9a2e-3c1d5e7f8a90', FLOW_CHR = '6b1f0002-4a3b-4d52-9a2e-3c1d5e7f8a90';
@@ -434,7 +459,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     aOffset: function (v) { return v.toFixed(2) + ' m'; },
     aSide: function (v) { return v === 0 ? '0.00 m' : Math.abs(v).toFixed(2) + ' m ' + (v > 0 ? 'rechts' : 'links'); }
   };
-  var rec = null, saved = null, watchId = null, demoTimer = null, wakeLock = null, follow = true, lastLL = null, samples = [], clockTimer = null;
+  var rec = null, saved = null, watchId = null, demoTimer = null, wakeLock = null, follow = true, lastLL = null, lastFixAt = 0, samples = [], clockTimer = null;
 
   function newRec() {
     return { origin: null, prevBoom: null, ref: null, quads: [], colors: [], track: [], cells: new Set(), sum: 0, parcels: {}, start: Date.now(), end: null, total0: null, odo: 0, lastP: null, hist: [], turning: false, turnAt: 0, turns: 0 };
@@ -584,7 +609,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 
   // ---------- GPS-Punkt verarbeiten ----------
   function onFix(lat, lon, kmh, headingDeg, t, acc) {
-    lastLL = [lat, lon];
+    lastLL = [lat, lon]; lastFixAt = Date.now();
     if (!map.hasLayer(tractor)) tractor.addTo(map);
     tractor.setLatLng(lastLL);
     if (follow) map.panTo(lastLL, { animate: false });
