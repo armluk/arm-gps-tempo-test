@@ -27,6 +27,7 @@ nav.tabs a[aria-current]{color:#fff;border-bottom-color:var(--yellow)}
 .leaflet-bar a{background:#000;color:#fff;width:44px !important;height:44px !important;line-height:44px !important;border-bottom:1px solid var(--fuge) !important}
 .leaflet-bar a:hover{background:var(--yellow);color:var(--dark)}
 .center-btn{display:flex !important;align-items:center;justify-content:center}
+.leaflet-bar a.center-btn.on{background:var(--yellow);color:var(--dark)}
 .leaflet-bottom .parcel.leaflet-control{margin-bottom:6px}
 .leaflet-left .parcel.leaflet-control{margin-left:6px}
 .leaflet-right .parcel.leaflet-control{margin-right:6px}
@@ -245,9 +246,9 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   var $ = function (id) { return document.getElementById(id); };
 
   // ---------- Karte ----------
-  var map = L.map('map', { zoomControl: false, preferCanvas: true, zoomSnap: 0.25 }).setView([46.8745, 7.7965], 16);
+  var map = L.map('map', { zoomControl: false, preferCanvas: true, zoomSnap: 0, maxZoom: 23 }).setView([46.8745, 7.7965], 16);
   L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg', {
-    maxZoom: 21, maxNativeZoom: 20, attribution: 'Luftbild © <a href="https://www.swisstopo.admin.ch/">swisstopo</a>'
+    maxZoom: 23, maxNativeZoom: 20, attribution: 'Luftbild © <a href="https://www.swisstopo.admin.ch/">swisstopo</a>'
   }).addTo(map);
   map.attributionControl.setPrefix(false);   // nur «Luftbild © swisstopo», damit das Parzellen-Feld Platz hat
   L.control.zoom({ position: 'topright', zoomInTitle: 'Hineinzoomen', zoomOutTitle: 'Herauszoomen' }).addTo(map);
@@ -258,7 +259,11 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       var a = L.DomUtil.create('a', 'center-btn', div);
       a.href = '#'; a.title = 'Auf Traktor zentrieren'; a.setAttribute('role', 'button'); a.setAttribute('aria-label', 'Auf Traktor zentrieren');
       a.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>';
-      L.DomEvent.on(a, 'click', function (e) { L.DomEvent.preventDefault(e); follow = true; if (lastLL) centerOnTractor(); });
+      L.DomEvent.on(a, 'click', function (e) { L.DomEvent.preventDefault(e); follow = true; setDetail(false); if (lastLL) centerOnTractor(); });
+      var z = L.DomUtil.create('a', 'center-btn', div);
+      z.id = 'detailBtn'; z.href = '#'; z.title = 'Verteiler gross anzeigen'; z.setAttribute('role', 'button'); z.setAttribute('aria-label', 'Verteiler gross anzeigen'); z.setAttribute('aria-pressed', 'false');
+      z.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M15 15l7 7M10 6.5v7M6.5 10h7"/></svg>';
+      L.DomEvent.on(z, 'click', function (e) { L.DomEvent.preventDefault(e); setDetail(!detail); });
       L.DomEvent.disableClickPropagation(div);
       return div;
     }
@@ -269,6 +274,32 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   function centerOnTractor() {
     var ll = L.latLng(lastLL);
     map.setView(ll, map.getBoundsZoom(ll.toBounds(CENTER_M)), { animate: false });
+  }
+  // Detail-Ansicht: feste Zoomstufe nur aus der Arbeitsbreite – der Verteiler füllt 50 % der Kartenbreite.
+  // Mitte = halbe Strecke zwischen Traktor und Verteiler; die Karte folgt dem Traktor, die Stufe bleibt fest.
+  var DETAIL_FILL = 0.5, detail = false, lastBoomLL = null, lastBoomAt = 0;
+  function detailZoom() {
+    var lat = (lastLL ? lastLL[0] : map.getCenter().lat) * Math.PI / 180;
+    var mpp = cfg.width / DETAIL_FILL / map.getSize().x;          // Meter pro Bildpunkt
+    return Math.min(map.getMaxZoom(), Math.log2(156543.03 * Math.cos(lat) / mpp));
+  }
+  function detailCenter() {
+    if (!lastLL) return null;
+    // Verteiler-Position nur, wenn aktuell (beim Wenden/Stehen gibt es keine) – sonst auf den Traktor
+    return lastBoomLL && Date.now() - lastBoomAt < 2000 ? L.latLng((lastLL[0] + lastBoomLL[0]) / 2, (lastLL[1] + lastBoomLL[1]) / 2) : L.latLng(lastLL);
+  }
+  function setDetail(on) {
+    detail = on;
+    var b = $('detailBtn'); if (b) { b.setAttribute('aria-pressed', String(on)); b.classList.toggle('on', on); }
+    if (!on) return;
+    follow = true;
+    var c = detailCenter() || map.getCenter();
+    map.setView(c, detailZoom(), { animate: false });
+  }
+  function followTo() {
+    if (!follow) return;
+    var c = detail ? detailCenter() : L.latLng(lastLL);
+    if (c) map.panTo(c, { animate: false });
   }
   map.on('dragstart', function () { follow = false; });
 
@@ -575,7 +606,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     Array.prototype.forEach.call(document.querySelectorAll('nav.tabs a'), function (a) {
       if (a.getAttribute('data-view') === v) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
-    if (v === 'karte') { map.invalidateSize(); if (follow && lastLL) map.panTo(lastLL, { animate: false }); }
+    if (v === 'karte') { map.invalidateSize(); if (detail) setDetail(true); else if (lastLL) followTo(); }
   }
   Array.prototype.forEach.call(document.querySelectorAll('nav.tabs a'), function (a) {
     a.addEventListener('click', function (e) { e.preventDefault(); setView(a.getAttribute('data-view')); history.replaceState(null, '', '#' + a.getAttribute('data-view')); });
@@ -601,6 +632,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     el.value = cfg[k];
     $(k + 'Out').textContent = fmtCfg[k](cfg[k]);
     saveCfg();
+    if (k === 'width' && detail) map.setZoom(detailZoom(), { animate: false });   // neue Breite = neue feste Stufe
     render();
   }
   function saveCfg() { try { localStorage.setItem(STORE + '-cfg', JSON.stringify(cfg)); } catch (e) {} }
@@ -632,7 +664,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     lastLL = [lat, lon]; lastFixAt = Date.now();
     if (!map.hasLayer(tractor)) tractor.addTo(map);
     tractor.setLatLng(lastLL);
-    if (follow) map.panTo(lastLL, { animate: false });
+    followTo();
     if (kmh !== null) { samples.push({ v: kmh, t: t }); samples = samples.filter(function (s) { return t - s.t <= WINDOW_MS; }); }
     if (acc !== null) {
       var accTxt = acc < 1 ? '±' + Math.max(1, Math.round(acc * 100)) + ' cm' + (acc <= 0.1 ? ' · RTK' : '') : '±' + Math.round(acc) + ' m' + (acc > 20 ? ' (schwach)' : '');
@@ -670,6 +702,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     var ant = cfg.source === 'antenna';
     var back = ant ? cfg.aOffset : cfg.offset, side = ant ? cfg.aSide : 0;
     var c = { x: p.x - back * f.x - side * r.x, y: p.y - back * f.y - side * r.y };
+    lastBoomLL = toLL(rec.origin, c); lastBoomAt = Date.now();
     var half = cfg.width / 2;
     var bl = { x: c.x - half * r.x, y: c.y - half * r.y }, br = { x: c.x + half * r.x, y: c.y + half * r.y };
     boomLine.setLatLngs([toLL(rec.origin, bl), toLL(rec.origin, br)]);
