@@ -176,7 +176,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <div class="set-row">
 <div class="set-head"><label for="speed">Soll-Geschwindigkeit</label><output id="speedOut">6.0 km/h</output></div>
 <div class="ctrl"><button class="step" type="button" data-k="speed" data-d="-1" aria-label="Soll-Geschwindigkeit um 0.5 km/h verringern">−</button><input id="speed" type="range" min="0" max="15" step="0.5" value="6"><button class="step" type="button" data-k="speed" data-d="1" aria-label="Soll-Geschwindigkeit um 0.5 km/h erhöhen">+</button></div>
-<p class="note">Mit verbundenem Durchflussmesser wird die Soll-Geschwindigkeit aus Durchfluss, Ausbringmenge und Arbeitsbreite berechnet. Traktor-Punkt auf der Karte: Ring läuft nach innen = zu schnell, nach aussen = zu langsam, je öfter, desto grösser die Abweichung. Gelb ohne Ring = im Bereich ±0.5 km/h. Grau = Wenden, grau und gross = Stillstand, hohl = kein GPS.</p>
+<p class="note">Mit verbundenem Durchflussmesser wird die Soll-Geschwindigkeit aus Durchfluss, Ausbringmenge und Arbeitsbreite berechnet. Traktor-Punkt auf der Karte: Ring läuft nach innen = zu schnell, nach aussen = zu langsam, je öfter, desto grösser die Abweichung. Gelb ohne Ring = im Bereich ±0.5 km/h. Grau = Wenden, gelb, gross und leicht pulsierend = Stillstand, hohl = kein GPS.</p>
 </div>
 <div class="set-row">
 <div class="set-head"><span class="lbl" id="turnLbl">Beim Wenden</span></div>
@@ -184,7 +184,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <button type="button" id="turnPause" aria-pressed="true">Nicht einfärben</button>
 <button type="button" id="turnGo" aria-pressed="false">Weiter einfärben</button>
 </div>
-<p class="note">Wenden wird erkannt, wenn sich die Fahrtrichtung auf 10 m um mehr als 45° ändert (auch Rückwärtsfahren). Gilt nur ohne Durchflussmesser – mit Durchflussmesser entscheidet der Durchfluss.</p>
+<p class="note">Als Wenden gilt eine Kehre von mehr als 100° (auch Rückwärtsfahren). Kurven darunter sind kein Wendemanöver. Gilt nur ohne Durchflussmesser – mit Durchflussmesser entscheidet der Durchfluss.</p>
 </div>
 </div>
 </section>
@@ -348,8 +348,14 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   // ---------- Traktor-Punkt mit Sonar-Ring ----------
   // zu schnell: Ring läuft nach innen · zu langsam: Ring läuft nach aussen
   // je grösser die Abweichung, desto öfter (alle 2 s … 0.5 s), erst nach 2 s ausserhalb der Toleranz
-  // Stillstand: grau und gross · Wenden: grau · im Soll: gelb ohne Ring · kein GPS seit 5 s: hohl
-  var RING_DELAY = 2000, GPS_STALE = 5000;
+  // Stillstand: gelb, gross, leicht pulsierend · Wenden: grau · im Soll: gelb ohne Ring · kein GPS seit 5 s: hohl
+  var RING_DELAY = 2000, GPS_STALE = 5000, pulseTimer = null;
+  function setStandPulse(on) {
+    if (on && !pulseTimer) {
+      var t0 = Date.now();
+      pulseTimer = setInterval(function () { tractor.setRadius(12 + 1.5 * Math.sin((Date.now() - t0) / 1800 * 2 * Math.PI)); }, 80);
+    } else if (!on && pulseTimer) { clearInterval(pulseTimer); pulseTimer = null; }
+  }
   var ringMark = L.marker([0, 0], { interactive: false, keyboard: false, zIndexOffset: -100,
     icon: L.divIcon({ className: 'sonar', iconSize: [24, 24], iconAnchor: [12, 12], html: '<i></i><i></i>' }) });
   var ring = { key: '', st: null, since: 0 };
@@ -357,9 +363,10 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   function renderTractor(v, st, turning) {
     if (!lastLL) return;
     var stale = Date.now() - lastFixAt > GPS_STALE && !demoTimer;
-    var grey = st === 'stop' || turning;
-    tractor.setStyle({ fillColor: grey ? '#888780' : YELLOW, fillOpacity: stale ? 0 : 1 });
-    tractor.setRadius(st === 'stop' && !stale ? 12 : 7);
+    var standing = st === 'stop' && !stale;
+    tractor.setStyle({ fillColor: turning && !standing ? '#888780' : YELLOW, fillOpacity: stale ? 0 : 1 });
+    setStandPulse(standing);
+    if (!standing) tractor.setRadius(7);
     // Ring nur bei laufender Aufzeichnung oder Tempo-Messung
     var dir = null, iv = 0;
     if ((rec || tempoOnly) && !stale && !turning && (st === 'up' || st === 'down')) {
@@ -462,14 +469,16 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   var rec = null, saved = null, watchId = null, demoTimer = null, wakeLock = null, follow = true, lastLL = null, lastFixAt = 0, samples = [], clockTimer = null;
 
   function newRec() {
-    return { origin: null, prevBoom: null, ref: null, quads: [], colors: [], track: [], cells: new Set(), sum: 0, parcels: {}, start: Date.now(), end: null, total0: null, odo: 0, lastP: null, hist: [], turning: false, turnAt: 0, turns: 0 };
+    return { origin: null, prevBoom: null, ref: null, quads: [], colors: [], track: [], cells: new Set(), sum: 0, parcels: {}, start: Date.now(), end: null, total0: null, odo: 0, lastP: null, hist: [], curve: null, turning: false, turns: 0 };
   }
 
   // ---------- Wendemanöver erkennen ----------
-  // Wenden = Fahrtrichtung ändert sich auf den letzten 10 m Fahrstrecke um mehr als 45° (auch Rückwärtsfahren).
-  // Ende = auf den letzten 5 m wieder geradeaus (< 12°) und mindestens 6 m seit Beginn.
-  var TURN_M = 10, TURN_IN = 45, TURN_OUT_M = 5, TURN_OUT = 12;
-  function angDiff(a, b) { var d = (a - b) / D % 360; if (d > 180) d -= 360; if (d < -180) d += 360; return Math.abs(d); }
+  // Wenden = Kehre von mehr als 100° (auch Rückwärtsfahren). Kurven darunter sind kein Wendemanöver.
+  // Kurve beginnt, wenn sich die Richtung auf 5 m um mehr als 15° ändert; die Drehung wird aufsummiert
+  // (Gegenkurven heben sich auf). Ende = auf den letzten 5 m wieder geradeaus (< 12°).
+  var CURVE_M = 5, CURVE_IN = 15, TURN_DEG = 100, STRAIGHT = 12;
+  function angSigned(a, b) { var d = (a - b) / D % 360; if (d > 180) d -= 360; if (d < -180) d += 360; return d; }
+  function angDiff(a, b) { return Math.abs(angSigned(a, b)); }
   function headingAgo(m) { for (var i = rec.hist.length - 1; i >= 0; i--) if (rec.odo - rec.hist[i].d >= m) return rec.hist[i]; return null; }
   function detectTurn(p, h) {
     var v = speedAvg();
@@ -477,15 +486,20 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     rec.lastP = p;
     if (h === null) return;
     var last = rec.hist[rec.hist.length - 1];
-    if (!last || rec.odo - last.d >= 0.5) rec.hist.push({ d: rec.odo, h: h });
-    while (rec.hist.length > 2 && rec.odo - rec.hist[1].d > TURN_M + 2) rec.hist.shift();
-    if (!rec.turning) {
-      var a = headingAgo(TURN_M);
-      if (a && angDiff(h, a.h) > TURN_IN) { rec.turning = true; rec.turnAt = rec.odo; }
-    } else {
-      var b = headingAgo(TURN_OUT_M);
-      if (b && rec.odo - rec.turnAt >= 6 && angDiff(h, b.h) < TURN_OUT) { rec.turning = false; rec.turns++; }
+    if (!last || rec.odo - last.d >= 0.5) {
+      rec.hist.push({ d: rec.odo, h: h });
+      if (rec.curve && last) rec.curve.sum += angSigned(h, last.h);
     }
+    while (rec.hist.length > 2 && rec.odo - rec.hist[1].d > CURVE_M + 2) rec.hist.shift();
+    var b = headingAgo(CURVE_M);
+    if (!b) return;
+    if (!rec.curve) {
+      if (angDiff(h, b.h) > CURVE_IN) rec.curve = { sum: angSigned(h, b.h) };
+    } else if (angDiff(h, b.h) < STRAIGHT) {
+      if (rec.turning) rec.turns++;
+      rec.turning = false; rec.curve = null;
+    }
+    if (rec.curve && Math.abs(rec.curve.sum) > TURN_DEG) rec.turning = true;
   }
 
   // lokale Meter-Koordinaten um den ersten Punkt
