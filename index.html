@@ -237,6 +237,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 </div>
 <button class="btn line" id="demo" type="button"><span>Demo ohne GPS</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
 <p class="note">Eingefärbt wird die Fläche unter dem Verteiler (Arbeitsbreite, Abstand hinter dem Traktor), nur bei mehr als 0.5 km/h. Handy-GPS liegt oft 3–5 m daneben – kleine Lücken oder Überlappungen auf der Karte sind deshalb normal. Luftbild © swisstopo.</p>
+<p class="note" id="powerInfo">Kartenanzeige Akkubetrieb: 30 Bilder/s.</p>
 </div>
 </section>
 </div>
@@ -339,14 +340,35 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (!boomAnim.cur) { boomAnim.from = boomAnim.to = boomAnim.cur = pair; boomLine.setLatLngs(pair); return; }
     boomAnim.from = boomAnim.cur; boomAnim.to = target;
   }
-  var lastMoveEnd = 0;
+  // Bildrate nach Stromversorgung: am Ladekabel 60 Bilder/s und Flächen 4×/s neu zeichnen,
+  // im Akkubetrieb 30 Bilder/s und Flächen 1×/s. Unbekannt (z. B. iPhone) = Akkubetrieb.
+  var power = { charging: false };
+  function powerMode() {
+    return power.charging ? { frameMs: 0, redrawMs: 250, label: 'am Ladekabel: 60 Bilder/s' } : { frameMs: 33, redrawMs: 1000, label: 'Akkubetrieb: 30 Bilder/s' };
+  }
+  function showPower() { var e = $('powerInfo'); if (e) e.textContent = 'Kartenanzeige ' + powerMode().label + '.'; }
+  if (navigator.getBattery) {
+    navigator.getBattery().then(function (b) {
+      power.charging = b.charging; showPower();
+      b.addEventListener('chargingchange', function () { power.charging = b.charging; showPower(); });
+    }).catch(function () {});
+  }
+  var lastMoveEnd = 0, lastFrame = 0, wasHidden = false;
   function frame() {
     requestAnimationFrame(frame);
     if (!disp.to) return;
-    var now = Date.now();
+    var now = Date.now(), pm = powerMode();
+    if (now - lastFrame < pm.frameMs) return;
+    // Karte nicht sichtbar (Tempo-Ansicht oder Menü offen): nichts zeichnen
+    var hidden = $('map').hidden || !$('drawer').hidden;
+    if (hidden) { wasHidden = true; return; }
+    if (wasHidden) { wasHidden = false; map.fire('moveend'); }
+    lastFrame = now;
     var k = disp.dur ? Math.min(1, (now - disp.t0) / disp.dur) : 1;
     var ll = lerpLL(disp.from, disp.to, k);
-    if (!disp.ll || !ll.equals(disp.ll)) { disp.ll = ll; tractor.setLatLng(ll); if (map.hasLayer(ringMark)) ringMark.setLatLng(ll); }
+    // Stillstand: hat sich nichts bewegt, wird nichts neu gezeichnet
+    var moved = !disp.ll || !ll.equals(disp.ll);
+    if (moved) { disp.ll = ll; tractor.setLatLng(ll); if (map.hasLayer(ringMark)) ringMark.setLatLng(ll); }
     if (boomAnim.to && boomAnim.from) {
       var b = [lerpLL(boomAnim.from[0], boomAnim.to[0], k), lerpLL(boomAnim.from[1], boomAnim.to[1], k)];
       if (!boomAnim.cur || !b[0].equals(boomAnim.cur[0])) { boomAnim.cur = b; boomLine.setLatLngs(b); }
@@ -354,15 +376,15 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     // Stück vom letzten Spline-Punkt bis zum Traktor
     if (rec && rec.splLast) {
       if (!splineTail) splineTail = L.polyline([], { color: '#FFFFFF', weight: 2, opacity: 0.8, interactive: false }).addTo(map);
-      splineTail.setLatLngs([rec.splLast, disp.ll]);
+      if (moved || splineTail.getLatLngs().length === 0) splineTail.setLatLngs([rec.splLast, disp.ll]);
     } else if (splineTail) { splineTail.remove(); splineTail = null; }
-    if (!follow || $('map').hidden) return;
+    if (!follow) return;
     var c = followCenter();
     if (!c) return;
     var off = map._getCenterOffset(c);
     if (Math.abs(off.x) >= 0.5 || Math.abs(off.y) >= 0.5) {
       map._rawPanBy(off.round()); map.fire('move');
-      if (now - lastMoveEnd > 1000) { lastMoveEnd = now; map.fire('moveend'); }
+      if (now - lastMoveEnd > pm.redrawMs) { lastMoveEnd = now; map.fire('moveend'); }
     }
   }
   requestAnimationFrame(frame);
@@ -436,7 +458,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   }
   function rotStep() {
     var now = Date.now(), dt = Math.min(0.5, (now - rot.t) / 1000); rot.t = now;
-    if (!cfg.headingUp || rot.target === null) return;
+    if (!cfg.headingUp || rot.target === null || $('map').hidden) return;
     if (rot.cur === null) rot.cur = rot.target;
     var diff = angSigned(rot.target * D, rot.cur * D), max = ROT_MAX_DEG_S * dt;
     var step = Math.abs(diff) < 0.3 ? diff : Math.max(-max, Math.min(max, diff * 0.35));
@@ -1101,6 +1123,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   setSource(cfg.source);
   setTurnPause(cfg.turnPause);
   setHeadingUp(cfg.headingUp);
+  showPower();
   setView(location.hash === '#tempo' ? 'tempo' : 'karte');   // Standard: Karte
   try {
     saved = JSON.parse(localStorage.getItem(STORE));
