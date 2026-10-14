@@ -4,24 +4,96 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#2E3236">
-<title>GPS-Tempo-Test</title>
+<title>Güllefass-Rechner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
 :root{--yellow:#FFF005;--dark:#2E3236;--surface:#3A3F44;--fuge:#4A5157;--on-dark:#C9CFD3;--error:#B3261E}
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--dark);color:#fff;font-family:Archivo,'Segoe UI',system-ui,-apple-system,Arial,sans-serif;-webkit-tap-highlight-color:transparent}
-body{min-height:100vh;display:flex;flex-direction:column}
-header{height:72px;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid var(--surface)}
+html,body{margin:0;height:100%;background:var(--dark);color:#fff;font-family:Archivo,'Segoe UI',system-ui,-apple-system,Arial,sans-serif;-webkit-tap-highlight-color:transparent}
+body{display:flex;flex-direction:column;min-height:100vh}
+header{height:64px;flex:none;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid var(--surface)}
 header img{width:44px;height:44px;background:#000;display:block}
 .brand b{display:block;font-size:14px;font-weight:900;letter-spacing:.02em}
 .brand span{font-size:11px;color:var(--on-dark)}
-main{flex:1;padding:20px 16px 24px;display:flex;flex-direction:column;gap:16px;max-width:520px;width:100%;margin:0 auto}
-.eyebrow{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--on-dark)}
-.eyebrow::before{content:"";width:28px;height:6px;background:var(--yellow)}
-.label{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--on-dark)}
-.panel{background:var(--surface);border-top:6px solid var(--yellow)}
+nav.tabs{display:grid;grid-template-columns:1fr 1fr;flex:none;border-bottom:1px solid var(--surface)}
+nav.tabs a{display:flex;align-items:center;justify-content:center;min-height:44px;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--on-dark);text-decoration:none;border-bottom:4px solid transparent}
+nav.tabs a[aria-current]{color:#fff;border-bottom-color:var(--yellow)}
+#map{flex:1;min-height:320px;background:#1f2225}
+.leaflet-container{font-family:inherit}
+.leaflet-bar,.leaflet-bar a,.leaflet-control-attribution{border-radius:0 !important}
+.leaflet-bar{border:0 !important}
+.leaflet-bar a{background:#000;color:#fff;width:44px !important;height:44px !important;line-height:44px !important;border-bottom:1px solid var(--fuge) !important}
+.leaflet-bar a:hover{background:var(--yellow);color:var(--dark)}
+.center-btn{display:flex !important;align-items:center;justify-content:center}
+.leaflet-bottom .parcel.leaflet-control{margin-bottom:6px}
+.leaflet-left .parcel.leaflet-control{margin-left:6px}
+.leaflet-right .parcel.leaflet-control{margin-right:6px}
+.parcel{background:var(--dark);color:#fff;padding:4px 8px;display:flex;align-items:baseline;gap:5px;border-left:3px solid var(--yellow)}
+.parcel[hidden]{display:none}
+.parcel span{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--on-dark)}
+.parcel b{font-size:14px;font-weight:900;line-height:1}
+.parcel small{font-size:9px;font-weight:700;color:var(--on-dark)}
+.speedbox{border-left:0;border-right:3px solid var(--yellow)}
+.speedbox em{font-style:normal;font-size:9px;font-weight:700;color:var(--on-dark)}
+.tr-arrow{background:none;border:0}
+.tr-arrow svg{display:block;width:30px;height:30px;overflow:visible}
+.panel{flex:none;background:var(--dark);padding:12px 16px 16px;display:flex;flex-direction:column;gap:12px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--fuge);border:1px solid var(--fuge)}
+.stat{background:var(--surface);padding:10px 8px;display:flex;flex-direction:column;gap:4px}
+.stat b{font-size:20px;font-weight:900;line-height:1}
+.stat b small{font-size:11px;font-weight:700;margin-left:2px}
+.stat span{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--on-dark)}
+.stats.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.stats[hidden],.legend[hidden]{display:none}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;font-weight:600;color:var(--on-dark)}
+.legend i{display:inline-block;width:12px;height:12px;margin-right:6px;vertical-align:-1px;border:1px solid var(--fuge)}
+.status{display:flex;justify-content:space-between;gap:8px;font-size:12px;font-weight:600;color:var(--on-dark)}
+.rec-dot{display:inline-block;width:9px;height:9px;background:var(--on-dark);margin-right:6px;vertical-align:baseline}
+.rec .rec-dot{background:var(--yellow)}
+.btn{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:56px;padding:16px 22px;border:2px solid var(--yellow);background:var(--yellow);color:var(--dark);font:700 14px/1 Archivo,'Segoe UI',system-ui,sans-serif;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.btn.stop{background:#fff;border-color:#fff}
+.btn.line{background:transparent;color:#fff;border-color:#fff;min-height:48px;padding:12px 16px;font-size:12px}
+.btn:active{background:var(--dark);color:var(--yellow)}
+.row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.icon-btn{width:44px;height:44px;flex:none;display:grid;place-items:center;border:0;background:#000;color:#fff;cursor:pointer;padding:0}
+.icon-btn svg{width:24px;height:24px}
+.icon-btn:active,.icon-btn[aria-expanded="true"]{background:var(--yellow);color:var(--dark)}
+.menu-btn{margin-left:auto}
+.drawer{position:fixed;inset:0;z-index:2000;background:var(--dark);overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:24px}
+.drawer[hidden]{display:none}
+.drawer-head{position:sticky;top:0;z-index:1;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:var(--dark);border-bottom:4px solid var(--yellow)}
+.drawer-head b{font-size:14px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}
+.group{border-bottom:1px solid var(--surface)}
+.group h2{margin:0;padding:18px 16px 6px;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--yellow)}
+.group .set{padding:8px 16px 18px}
+.set{padding:4px 14px 14px;display:flex;flex-direction:column;gap:14px}
+.set-row{display:flex;flex-direction:column;gap:6px}
+.set-head{display:flex;justify-content:space-between;align-items:baseline}
+.set-head label{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--on-dark)}
+.set-head output{font-size:22px;font-weight:900}
+.set-head .lbl{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--on-dark)}
+.set-row[hidden]{display:none}
+.seg{display:flex;gap:2px;background:#fff;border:2px solid #fff}
+.seg button{flex:1;min-height:44px;border:0;background:var(--dark);color:#fff;font:700 12px/1.2 Archivo,'Segoe UI',system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--yellow);color:var(--dark)}
+.ctrl{display:flex;align-items:center;gap:10px}
+.step{width:44px;height:44px;flex:none;border:0;background:#000;color:#fff;font:900 22px/1 Archivo,sans-serif;cursor:pointer}
+.step:active{background:var(--yellow);color:var(--dark)}
+input[type=range]{-webkit-appearance:none;appearance:none;flex:1;min-width:0;height:44px;margin:0;background:transparent}
+input[type=range]::-webkit-slider-runnable-track{height:8px;background:var(--fuge)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;margin-top:-10px;background:var(--yellow);border:2px solid var(--dark);border-radius:0}
+input[type=range]::-moz-range-track{height:8px;background:var(--fuge)}
+input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yellow);border:2px solid var(--dark);border-radius:0}
+.msg{font-size:14px;font-weight:600;color:#fff;background:var(--error);padding:10px 12px;margin:0}
+.msg[hidden]{display:none}
+.note{font-size:12px;line-height:1.5;color:var(--on-dark);margin:0}
+#map[hidden],.tempo-view[hidden]{display:none}
+.tempo-view{flex:1;padding:16px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;max-width:520px;width:100%;margin:0 auto}
+.tpanel{background:var(--surface);border-top:6px solid var(--yellow)}
 .tempo{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 16px 16px}
+.label{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--on-dark)}
 .ist{font-size:88px;font-weight:900;line-height:1;letter-spacing:-.02em}
 .ist small{font-size:20px;font-weight:700;letter-spacing:0;margin-left:6px}
 .soll-line{font-size:14px;font-weight:600;color:var(--on-dark);margin-top:6px}
@@ -30,213 +102,782 @@ main{flex:1;padding:20px 16px 24px;display:flex;flex-direction:column;gap:16px;m
 .arrow .txt{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--yellow)}
 .arrow[hidden]{display:flex;visibility:hidden}
 .foot{display:flex;justify-content:space-between;gap:8px;padding:10px 16px;border-top:1px solid var(--dark);font-size:12px;font-weight:600;color:var(--on-dark)}
-.warn{color:#fff;background:var(--error);padding:2px 6px}
-.soll{padding:16px;display:flex;flex-direction:column;gap:10px;border:1px solid var(--fuge)}
-.soll-row{display:flex;align-items:baseline;justify-content:space-between}
-.soll-val{font-size:30px;font-weight:900}
-.soll-val small{font-size:14px;font-weight:700;margin-left:4px}
-.ctrl{display:flex;align-items:center;gap:10px}
-.step{width:44px;height:44px;flex:none;border:0;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
-.step:active{background:var(--yellow);color:var(--dark)}
-input[type=range]{-webkit-appearance:none;appearance:none;flex:1;min-width:0;height:44px;margin:0;background:transparent}
-input[type=range]::-webkit-slider-runnable-track{height:8px;background:linear-gradient(to right,#fff var(--p,40%),var(--fuge) var(--p,40%))}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;margin-top:-10px;background:var(--yellow);border:2px solid var(--dark);border-radius:0}
-input[type=range]::-moz-range-track{height:8px;background:var(--fuge)}
-input[type=range]::-moz-range-progress{height:8px;background:#fff}
-input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yellow);border:2px solid var(--dark);border-radius:0}
-.btn{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:56px;padding:16px 22px;border:2px solid var(--yellow);background:var(--yellow);color:var(--dark);font:700 14px/1 Archivo,'Segoe UI',system-ui,sans-serif;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
-.btn.line{background:transparent;color:#fff;border-color:#fff}
-.btn:active{background:var(--dark);color:var(--yellow)}
-.note{font-size:13px;line-height:1.55;color:var(--on-dark);margin:0}
-.msg{font-size:14px;font-weight:600;color:#fff;background:var(--error);padding:10px 12px;margin:0}
-.msg[hidden]{display:none}
-nav.tabs{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--surface)}
-nav.tabs a{display:flex;align-items:center;justify-content:center;min-height:44px;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--on-dark);text-decoration:none;border-bottom:4px solid transparent}
-nav.tabs a[aria-current]{color:#fff;border-bottom-color:var(--yellow)}
+.btn[hidden]{display:none}
+@media (max-width:360px){.ist{font-size:68px}.arrow,.arrow .tile{width:92px}.arrow .tile{height:92px}}
 </style>
 </head>
 <body>
 <header>
 <img src="arm-signet.png" alt="Arm Eggiwil AG">
-<div class="brand"><b>ARM EGGIWIL AG</b><span>Güllefass-Rechner · GPS-Tempo-Test</span></div>
+<div class="brand"><b>ARM EGGIWIL AG</b><span>Güllefass-Rechner</span></div>
+<button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="Einstellungen öffnen" aria-expanded="false" aria-controls="drawer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
 </header>
 <nav class="tabs" aria-label="Ansicht">
-<a href="index.html" aria-current="page">Tempo</a>
-<a href="karte.html">Karte</a>
+<a href="#tempo" data-view="tempo">Tempo</a>
+<a href="#karte" data-view="karte" aria-current="page">Karte</a>
 </nav>
-<main>
-<div class="eyebrow">Fahransicht · GPS</div>
 
-<section class="panel" aria-live="polite">
+<div id="map" role="region" aria-label="Karte der überfahrenen Fläche"></div>
+
+<div class="tempo-view" id="tempoView" hidden>
+<section class="tpanel" aria-live="polite">
 <div class="tempo">
 <div>
-<div class="label" id="istLabel">Ist-Geschwindigkeit</div>
+<div class="label">Ist-Geschwindigkeit</div>
 <div class="ist"><span id="ist">–</span><small>km/h</small></div>
-<div class="soll-line">Soll <span id="sollTxt">6.0</span> km/h · ±0.5</div>
+<div class="soll-line" id="sollLine">Soll 6.0 km/h · ±0.5</div>
 </div>
 <div class="arrow" id="arrow" hidden>
-<div class="tile"><svg id="arrowSvg" width="68" height="68" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><path d="M12 20V5"></path><path d="M5 11l7-7 7 7"></path></svg></div>
-<div class="txt" id="arrowTxt">Schneller</div>
+<div class="tile"><svg id="arrowSvg" width="68" height="68" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"></svg></div>
+<div class="txt" id="arrowTxt"></div>
 </div>
 </div>
-<div class="foot"><span id="status">GPS aus</span><span id="acc">Mittelwert über 5 s</span></div>
+<div class="foot"><span id="tParcel">Parzelle –</span><span>Mittelwert über 5 s</span></div>
 </section>
+<button class="btn line" id="gpsOnly" type="button"><span>Nur Tempo messen (ohne Aufzeichnung)</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
+<p class="note">Pfeil hoch: schneller fahren. Pfeil runter: langsamer fahren. Kein Pfeil: im Sollbereich ±0.5 km/h oder beim Wenden. «=» bedeutet Stillstand (0.5 km/h oder weniger). Die Soll-Geschwindigkeit wird im Menü oben rechts eingestellt.</p>
+</div>
 
+<section class="panel">
+<div class="stats" aria-live="polite">
+<div class="stat"><b id="sSpeed">–<small>km/h</small></b><span>Tempo</span></div>
+<div class="stat"><b id="sArea">0.00<small>ha</small></b><span>Fläche</span></div>
+<div class="stat"><b id="sAmount">0<small>m³</small></b><span>Menge</span></div>
+<div class="stat"><b id="sOverlap">0<small>%</small></b><span>Überlappt</span></div>
+</div>
+<div class="stats three" id="flowStats" hidden aria-live="polite">
+<div class="stat"><b id="sFlow">–<small>l/min</small></b><span>Durchfluss</span></div>
+<div class="stat"><b id="sRate">–<small>m³/ha</small></b><span>Ist-Menge</span></div>
+<div class="stat"><b id="sMeasured">0.0<small>m³</small></b><span>Gemessen</span></div>
+</div>
+<div class="legend" id="legend" hidden><span><i style="background:#FFFFFF"></i>unter 90 %</span><span><i style="background:#FFF005"></i>Soll ±10 %</span><span><i style="background:#C62828"></i>über 110 %</span></div>
+<div class="status" id="statusBar"><span id="status"><span class="rec-dot"></span>Bereit</span><span id="acc">Dauer 00:00</span></div>
 <p class="msg" id="msg" hidden></p>
 
-<section class="soll">
-<div class="soll-row"><label class="label" for="soll">Soll-Geschwindigkeit</label><div class="soll-val"><span id="sollVal">6.0</span><small>km/h</small></div></div>
-<div class="ctrl">
-<button class="step" id="minus" type="button" aria-label="Soll um 0.5 km/h verringern"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" aria-hidden="true"><path d="M5 12h14"/></svg></button>
-<input id="soll" type="range" min="0" max="15" step="0.5" value="6">
-<button class="step" id="plus" type="button" aria-label="Soll um 0.5 km/h erhöhen"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
+<button class="btn" id="startStop" type="button"><span>Aufzeichnung starten</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
+
+</section>
+
+<div class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle" hidden>
+<div class="drawer-head"><b id="drawerTitle">Einstellungen</b><button class="icon-btn" id="menuClose" type="button" aria-label="Einstellungen schliessen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button></div>
+
+<section class="group">
+<h2>Fass &amp; Ausbringung</h2>
+<div class="set">
+<div class="set-row">
+<div class="set-head"><label for="width">Arbeitsbreite</label><output id="widthOut">12.00 m</output></div>
+<div class="ctrl"><button class="step" type="button" data-k="width" data-d="-1" aria-label="Arbeitsbreite um 0.25 m verringern">−</button><input id="width" type="range" min="5" max="30" step="0.25" value="12"><button class="step" type="button" data-k="width" data-d="1" aria-label="Arbeitsbreite um 0.25 m erhöhen">+</button></div>
+</div>
+<div class="set-row">
+<div class="set-head"><label for="rate">Ausbringmenge</label><output id="rateOut">25 m³/ha</output></div>
+<div class="ctrl"><button class="step" type="button" data-k="rate" data-d="-1" aria-label="Ausbringmenge um 1 m³/ha verringern">−</button><input id="rate" type="range" min="0" max="100" step="1" value="25"><button class="step" type="button" data-k="rate" data-d="1" aria-label="Ausbringmenge um 1 m³/ha erhöhen">+</button></div>
+</div>
+<div class="set-row">
+<div class="set-head"><label for="speed">Soll-Geschwindigkeit</label><output id="speedOut">6.0 km/h</output></div>
+<div class="ctrl"><button class="step" type="button" data-k="speed" data-d="-1" aria-label="Soll-Geschwindigkeit um 0.5 km/h verringern">−</button><input id="speed" type="range" min="0" max="15" step="0.5" value="6"><button class="step" type="button" data-k="speed" data-d="1" aria-label="Soll-Geschwindigkeit um 0.5 km/h erhöhen">+</button></div>
+<p class="note">Mit verbundenem Durchflussmesser wird die Soll-Geschwindigkeit aus Durchfluss, Ausbringmenge und Arbeitsbreite berechnet. Pfeil neben dem Traktor: hoch = schneller, runter = langsamer, «=» = Stillstand, kein Pfeil = im Bereich ±0.5 km/h oder beim Wenden.</p>
+</div>
+<div class="set-row">
+<div class="set-head"><span class="lbl" id="turnLbl">Beim Wenden</span></div>
+<div class="seg" role="group" aria-labelledby="turnLbl">
+<button type="button" id="turnPause" aria-pressed="true">Nicht einfärben</button>
+<button type="button" id="turnGo" aria-pressed="false">Weiter einfärben</button>
+</div>
+<p class="note">Wenden wird erkannt, wenn sich die Fahrtrichtung auf 10 m um mehr als 45° ändert (auch Rückwärtsfahren). Gilt nur ohne Durchflussmesser – mit Durchflussmesser entscheidet der Durchfluss.</p>
+</div>
 </div>
 </section>
 
-<button class="btn" id="start" type="button"><span>GPS starten</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
+<section class="group">
+<h2>Position</h2>
+<div class="set">
+<div class="set-row">
+<div class="set-head"><span class="lbl" id="srcLbl">Position kommt von</span></div>
+<div class="seg" role="group" aria-labelledby="srcLbl">
+<button type="button" id="srcPhone" aria-pressed="true">Handy im Traktor</button>
+<button type="button" id="srcAnt" aria-pressed="false">Antenne</button>
+</div>
+</div>
+<div class="set-row" id="rowPhone">
+<div class="set-head"><label for="offset">Abstand Traktor–Verteiler</label><output id="offsetOut">3.0 m</output></div>
+<div class="ctrl"><button class="step" type="button" data-k="offset" data-d="-1" aria-label="Abstand um 0.5 m verringern">−</button><input id="offset" type="range" min="0" max="15" step="0.5" value="3"><button class="step" type="button" data-k="offset" data-d="1" aria-label="Abstand um 0.5 m erhöhen">+</button></div>
+</div>
+<div class="set-row" id="rowAnt" hidden>
+<div class="set-head"><label for="aOffset">Antenne → Verteiler (Fahrtrichtung)</label><output id="aOffsetOut">0.00 m</output></div>
+<div class="ctrl"><button class="step" type="button" data-k="aOffset" data-d="-1" aria-label="Abstand Antenne um 5 cm verringern">−</button><input id="aOffset" type="range" min="-5" max="15" step="0.05" value="0"><button class="step" type="button" data-k="aOffset" data-d="1" aria-label="Abstand Antenne um 5 cm erhöhen">+</button></div>
+<p class="note">0 = Antenne genau über dem Verteiler. Positiv = Verteiler liegt hinter der Antenne, negativ = davor.</p>
+</div>
+<div class="set-row" id="rowSide" hidden>
+<div class="set-head"><label for="aSide">Antenne seitlich versetzt</label><output id="aSideOut">0.00 m</output></div>
+<div class="ctrl"><button class="step" type="button" data-k="aSide" data-d="-1" aria-label="Seitlichen Versatz um 5 cm nach links">−</button><input id="aSide" type="range" min="-5" max="5" step="0.05" value="0"><button class="step" type="button" data-k="aSide" data-d="1" aria-label="Seitlichen Versatz um 5 cm nach rechts">+</button></div>
+<p class="note">Gemessen von der Verteiler-Mitte. Positiv = Antenne rechts der Mitte (in Fahrtrichtung), negativ = links.</p>
+</div>
+</div>
+</section>
+
+<section class="group">
+<h2>Durchflussmesser</h2>
+<div class="set">
+<button class="btn line" id="flowBtn" type="button"><span>Durchflussmesser verbinden</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
+</div>
+</section>
+
+<section class="group">
+<h2>Karte &amp; Export</h2>
+<div class="set">
+<div class="row">
+<button class="btn line" id="dlKml" type="button">KML</button>
+<button class="btn line" id="dlGeo" type="button">GeoJSON</button>
+<button class="btn line" id="clear" type="button">Neu</button>
+</div>
 <button class="btn line" id="demo" type="button"><span>Demo ohne GPS</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
+<p class="note">Eingefärbt wird die Fläche unter dem Verteiler (Arbeitsbreite, Abstand hinter dem Traktor), nur bei mehr als 0.5 km/h. Handy-GPS liegt oft 3–5 m daneben – kleine Lücken oder Überlappungen auf der Karte sind deshalb normal. Luftbild © swisstopo.</p>
+</div>
+</section>
+</div>
 
-<p class="note">Pfeil hoch: schneller fahren. Pfeil runter: langsamer fahren. Kein Pfeil: im Sollbereich ±0.5 km/h. «=» bedeutet Stillstand (0.5 km/h oder weniger), die Geschwindigkeit zeigt dann «–». Der Bildschirm bleibt eingeschaltet, solange das GPS läuft.</p>
-</main>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 (function () {
-  var TOL = 0.5, WINDOW_MS = 5000, STAND = 0.5;
+  var STAND = 0.5, WINDOW_MS = 5000, MAX_JUMP = 30, CELL = 1, STORE = 'arm-guelle-karte-v1';
+  var D = Math.PI / 180;
   var $ = function (id) { return document.getElementById(id); };
-  var soll = 6, samples = [], last = null, watchId = null, demoTimer = null, wakeLock = null;
 
-  function fmt(n) { return n.toFixed(1); }
-
-  function setSoll(v) {
-    soll = Math.min(15, Math.max(0, Math.round(v * 2) / 2));
-    $('soll').value = soll;
-    $('soll').style.setProperty('--p', (soll / 15 * 100) + '%');
-    $('sollVal').textContent = fmt(soll);
-    $('sollTxt').textContent = fmt(soll);
-    render();
-  }
-
-  function haversine(a, b) {
-    var R = 6371000, toRad = Math.PI / 180;
-    var dLat = (b.latitude - a.latitude) * toRad, dLon = (b.longitude - a.longitude) * toRad;
-    var h = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(a.latitude * toRad) * Math.cos(b.latitude * toRad) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    return 2 * R * Math.asin(Math.sqrt(h));
-  }
-
-  function addSample(kmh, t) {
-    samples.push({ v: kmh, t: t });
-    samples = samples.filter(function (s) { return t - s.t <= WINDOW_MS; });
-    render();
-  }
-
-  function average() {
-    if (!samples.length) return null;
-    var sum = 0;
-    samples.forEach(function (s) { sum += s.v; });
-    return sum / samples.length;
-  }
-
-  function render() {
-    var avg = average();
-    var arrow = $('arrow');
-    $('istLabel').textContent = 'Ist-Geschwindigkeit';
-    if (avg === null) { $('ist').textContent = '–'; arrow.hidden = true; return; }
-    if (avg <= STAND) {
-      $('ist').textContent = '–';
-      $('arrowSvg').innerHTML = '<path d="M5 9h14"></path><path d="M5 15h14"></path>';
-      $('arrowTxt').textContent = 'Stillstand';
-      arrow.hidden = false;
-      return;
+  // ---------- Karte ----------
+  var map = L.map('map', { zoomControl: false, preferCanvas: true }).setView([46.8745, 7.7965], 16);
+  L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg', {
+    maxZoom: 21, maxNativeZoom: 20, attribution: 'Luftbild © <a href="https://www.swisstopo.admin.ch/">swisstopo</a>'
+  }).addTo(map);
+  map.attributionControl.setPrefix(false);   // nur «Luftbild © swisstopo», damit das Parzellen-Feld Platz hat
+  L.control.zoom({ position: 'topright', zoomInTitle: 'Hineinzoomen', zoomOutTitle: 'Herauszoomen' }).addTo(map);
+  var CenterCtl = L.Control.extend({
+    options: { position: 'topright' },
+    onAdd: function () {
+      var div = L.DomUtil.create('div', 'leaflet-bar');
+      var a = L.DomUtil.create('a', 'center-btn', div);
+      a.href = '#'; a.title = 'Auf Traktor zentrieren'; a.setAttribute('role', 'button'); a.setAttribute('aria-label', 'Auf Traktor zentrieren');
+      a.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>';
+      L.DomEvent.on(a, 'click', function (e) { L.DomEvent.preventDefault(e); follow = true; if (lastLL) map.setView(lastLL, Math.max(map.getZoom(), 17)); });
+      L.DomEvent.disableClickPropagation(div);
+      return div;
     }
-    $('ist').textContent = fmt(avg);
-    var path;
-    if (avg < soll - TOL) {
-      path = '<path d="M12 20V5"></path><path d="M5 11l7-7 7 7"></path>';
-      $('arrowTxt').textContent = 'Schneller';
-      arrow.hidden = false;
-    } else if (avg > soll + TOL) {
-      path = '<path d="M12 4v15"></path><path d="M5 13l7 7 7-7"></path>';
-      $('arrowTxt').textContent = 'Langsamer';
-      arrow.hidden = false;
+  });
+  map.addControl(new CenterCtl());
+  map.on('dragstart', function () { follow = false; });
+
+  // ---------- Parzellennummer (geo.admin.ch, Layer CadastralWebMap) ----------
+  // Abfrage an der Traktor-Position, ohne GPS an der Kartenmitte; gedrosselt, Antwort darf verzögert kommen
+  var ParcelCtl = L.Control.extend({
+    options: { position: 'bottomleft' },
+    onAdd: function () { var d = L.DomUtil.create('div', 'parcel'); d.setAttribute('aria-live', 'polite'); d.hidden = true; return d; }
+  });
+  var parcelBox = new ParcelCtl().addTo(map).getContainer();
+  var parcel = { busy: false, ll: null, t: 0, timer: null, cur: null };
+  function parcelQuery() {
+    var gps = !!lastLL, ll = gps ? L.latLng(lastLL) : map.getCenter();
+    if (parcel.busy) return;
+    if (parcel.ll && parcel.ll.distanceTo(ll) < 5 && Date.now() - parcel.t < 30000) return;
+    parcel.busy = true; parcel.ll = ll; parcel.t = Date.now();
+    var url = 'https://api3.geo.admin.ch/rest/services/ech/MapServer/identify?geometryType=esriGeometryPoint&sr=4326&tolerance=0&returnGeometry=false&lang=de'
+      + '&layers=all:ch.kantone.cadastralwebmap-farbe&geometry=' + ll.lng.toFixed(7) + ',' + ll.lat.toFixed(7)
+      + '&mapExtent=' + [ll.lng - 0.001, ll.lat - 0.001, ll.lng + 0.001, ll.lat + 0.001].map(function (n) { return n.toFixed(7); }).join(',') + '&imageDisplay=100,100,96';
+    fetch(url).then(function (r) { return r.ok ? r.json() : Promise.reject(); }).then(function (j) {
+      var a = j.results && j.results[0] && j.results[0].attributes;
+      parcel.cur = gps && a && a.number ? (a.ak ? a.ak + ' ' : '') + a.number : null;
+      parcelBox.innerHTML = a && a.number
+        ? '<span>Parzelle' + (gps ? '' : ' · Kartenmitte') + '</span><b>' + String(a.number).replace(/[<>&]/g, '') + '</b>' + (a.ak ? '<small>' + String(a.ak).replace(/[<>&]/g, '') + '</small>' : '')
+        : '<span>Parzelle' + (gps ? '' : ' · Kartenmitte') + '</span><b>–</b>';
+      parcelBox.hidden = false;
+      $('tParcel').textContent = 'Parzelle ' + (a && a.number ? (a.ak ? a.ak + ' ' : '') + a.number : '–') + (gps ? '' : ' · Kartenmitte');
+    }).catch(function () { parcel.ll = null; }).then(function () { parcel.busy = false; });
+  }
+  function parcelSoon() { clearTimeout(parcel.timer); parcel.timer = setTimeout(parcelQuery, 600); }
+  map.on('moveend', function () { if (!lastLL) parcelSoon(); });
+  setInterval(function () { if (lastLL) parcelQuery(); }, 3000);
+  parcelSoon();
+
+  var coverLayer = L.layerGroup().addTo(map);
+  var trackLine = L.polyline([], { color: '#FFFFFF', weight: 2, opacity: 0.8, interactive: false }).addTo(map);
+  var boomLine = L.polyline([], { color: '#2E3236', weight: 5, opacity: 1, interactive: false }).addTo(map);
+  var tractor = L.circleMarker([0, 0], { radius: 7, color: '#000', weight: 3, fillColor: '#FFF005', fillOpacity: 1, interactive: false });
+  var YELLOW = '#FFF005', LOW = '#FFFFFF', HIGH = '#C62828';
+  function coverStyle(color) { return { stroke: false, fillColor: color || YELLOW, fillOpacity: 0.45, interactive: false }; }
+
+  // ---------- Ist-Geschwindigkeit: Feld unten rechts und Pfeil neben dem Traktor ----------
+  var TOL = 0.5;
+  var ARROW = {
+    up: '<path d="M12 20V5"/><path d="M5 11l7-7 7 7"/>',
+    down: '<path d="M12 4v15"/><path d="M5 13l7 7 7-7"/>',
+    stop: '<path d="M5 9h14"/><path d="M5 15h14"/>'
+  };
+  var SpeedCtl = L.Control.extend({
+    options: { position: 'bottomright' },
+    onAdd: function () { var d = L.DomUtil.create('div', 'parcel speedbox'); d.setAttribute('aria-live', 'polite'); d.hidden = true; return d; }
+  });
+  var speedBox = new SpeedCtl().addTo(map).getContainer();
+  var arrowMark = L.marker([0, 0], { interactive: false, keyboard: false, zIndexOffset: 1000,
+    icon: L.divIcon({ className: 'tr-arrow', html: '', iconSize: [30, 30], iconAnchor: [-12, 15] }) });
+  var arrowState = null;
+  // Soll: aus dem Durchfluss (Tempo, bei dem die Ist-Menge der Ausbringmenge entspricht), sonst Einstellung
+  function sollSpeed() {
+    if (flowLive() && flow.lmin >= MIN_FLOW && cfg.rate > 0 && cfg.width > 0) return { v: flow.lmin * 0.6 / (cfg.rate * cfg.width), flow: true };
+    return { v: cfg.speed, flow: false };
+  }
+  function speedState(v, soll) {
+    if (v === null) return null;
+    if (v <= STAND) return 'stop';
+    return v < soll - TOL ? 'up' : v > soll + TOL ? 'down' : 'ok';
+  }
+  function renderSpeed(v) {
+    var s = sollSpeed(), st = speedState(v, s.v);
+    var txt = { up: 'schneller', down: 'langsamer', stop: 'Stillstand', ok: 'im Soll' };
+    speedBox.hidden = v === null;
+    if (v !== null) {
+      speedBox.innerHTML = '<span>Tempo</span><b>' + (v <= STAND ? '–' : v.toFixed(1)) + '</b><small>km/h</small><em>· Soll ' + s.v.toFixed(1) + '</em>';
+      speedBox.setAttribute('aria-label', 'Tempo ' + (v <= STAND ? 'Stillstand' : v.toFixed(1) + ' km/h, ' + txt[st]));
+    }
+    // Tempo-Ansicht (grosse Anzeige)
+    $('ist').textContent = v === null || v <= STAND ? '–' : v.toFixed(1);
+    var turning = !!(rec && rec.turning);
+    $('sollLine').textContent = 'Soll ' + s.v.toFixed(1) + ' km/h · ±' + TOL + (s.flow ? ' · aus Durchfluss' : '') + (turning ? ' · Wenden' : '');
+    // beim Wenden wie auf der Karte kein Pfeil
+    var big = !!(st && st !== 'ok' && !turning);
+    $('arrow').hidden = !big;
+    if (big) { $('arrowSvg').innerHTML = ARROW[st]; $('arrowTxt').textContent = { up: 'Schneller', down: 'Langsamer', stop: 'Stillstand' }[st]; }
+    // Pfeil neben dem Traktor nur während der Aufzeichnung
+    // beim Wenden kein Pfeil und kein «=»
+    var show = !!(rec && lastLL && st && st !== 'ok' && !rec.turning);
+    if (!show) { if (map.hasLayer(arrowMark)) arrowMark.remove(); arrowState = null; return; }
+    arrowMark.setLatLng(lastLL);
+    if (!map.hasLayer(arrowMark)) arrowMark.addTo(map);
+    if (arrowState !== st) {
+      arrowState = st;
+      // gelb mit schwarzem Rand, damit er auf dem Luftbild gut sichtbar ist
+      arrowMark.setIcon(L.divIcon({ className: 'tr-arrow', iconSize: [30, 30], iconAnchor: [-12, 15],
+        html: '<svg viewBox="0 0 24 24" fill="none" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><g stroke="#000" stroke-width="5.5">' + ARROW[st] + '</g><g stroke="#FFF005" stroke-width="2.5">' + ARROW[st] + '</g></svg>' }));
+    }
+  }
+
+  // ---------- Durchflussmesser (Bluetooth LE, ESP32) ----------
+  var FLOW_SVC = '6b1f0001-4a3b-4d52-9a2e-3c1d5e7f8a90', FLOW_CHR = '6b1f0002-4a3b-4d52-9a2e-3c1d5e7f8a90';
+  var MIN_FLOW = 20, FLOW_STALE_MS = 5000;
+  var flow = { device: null, connected: false, lmin: null, total: null, t: 0 };
+  function flowLive() { return flow.connected && flow.lmin !== null && Date.now() - flow.t < FLOW_STALE_MS; }
+  function actualRate() {
+    var v = speedAvg();
+    if (!flowLive() || v === null || v <= STAND || cfg.width <= 0) return null;
+    return flow.lmin * 0.6 / (v * cfg.width);   // m³/ha = l/min × 0.6 ÷ (km/h × m)
+  }
+  function rateColor() {
+    var ar = actualRate();
+    if (ar === null || cfg.rate <= 0) return YELLOW;
+    return ar < cfg.rate * 0.9 ? LOW : ar > cfg.rate * 1.1 ? HIGH : YELLOW;
+  }
+  // Farbklassen für Karte und Export (KML-Farbe: aabbggrr)
+  var CLASSES = [
+    { color: YELLOW, name: 'Überfahrene Fläche (Soll ±10 %)', kml: '7305f0ff' },
+    { color: LOW, name: 'Zu wenig (unter 90 % Soll)', kml: '73ffffff' },
+    { color: HIGH, name: 'Zu viel (über 110 % Soll)', kml: '732828c6' }
+  ];
+
+  function onFlowValue(text) {
+    var parts = String(text).split(';');
+    var lmin = parseFloat(parts[0]), total = parseFloat(parts[1]);
+    if (isNaN(lmin) || isNaN(total)) return;
+    flow.lmin = Math.max(0, lmin); flow.total = total; flow.t = Date.now();
+    if (rec && rec.total0 === null) rec.total0 = total;
+    render();
+  }
+  function setFlowBtn(text) { $('flowBtn').firstElementChild.textContent = text; }
+  function connectFlow() {
+    if (!flow.device) return Promise.reject(new Error('kein Gerät'));
+    setFlowBtn('Verbinde …');
+    return flow.device.gatt.connect()
+      .then(function (server) { return server.getPrimaryService(FLOW_SVC); })
+      .then(function (svc) { return svc.getCharacteristic(FLOW_CHR); })
+      .then(function (chr) {
+        chr.addEventListener('characteristicvaluechanged', function (e) { onFlowValue(new TextDecoder().decode(e.target.value)); });
+        return chr.startNotifications();
+      })
+      .then(function () { flow.connected = true; setFlowBtn('Durchflussmesser verbunden ✓'); showMsg(''); render(); });
+  }
+  $('flowBtn').addEventListener('click', function () {
+    if (flow.connected && flow.device) { flow.connected = false; flow.device.gatt.disconnect(); return; }
+    if (!navigator.bluetooth) { showMsg('Bluetooth wird in diesem Browser nicht unterstützt. Bitte Chrome auf Android verwenden.'); return; }
+    navigator.bluetooth.requestDevice({ filters: [{ services: [FLOW_SVC] }] })
+      .then(function (dev) {
+        flow.device = dev;
+        dev.addEventListener('gattserverdisconnected', function () {
+          var wanted = flow.connected;
+          flow.connected = false; render();
+          if (!wanted) { setFlowBtn('Durchflussmesser verbinden'); return; }
+          setFlowBtn('Verbindung verloren – verbinde neu …');
+          setTimeout(function retry() { if (!flow.device) return; connectFlow().catch(function () { setTimeout(retry, 3000); }); }, 1000);
+        });
+        return connectFlow();
+      })
+      .catch(function (e) {
+        setFlowBtn('Durchflussmesser verbinden');
+        if (e && e.name !== 'NotFoundError') showMsg('Durchflussmesser nicht verbunden: ' + (e.message || e));
+      });
+  });
+
+  // ---------- Zustand ----------
+  var cfg = { width: 12, offset: 3, rate: 25, speed: 6, source: 'phone', aOffset: 0, aSide: 0, turnPause: true };
+  var KEYS = ['width', 'offset', 'rate', 'speed', 'aOffset', 'aSide'];
+  var steps = { width: 0.25, offset: 0.5, rate: 1, speed: 0.5, aOffset: 0.05, aSide: 0.05 };
+  var fmtCfg = {
+    speed: function (v) { return v.toFixed(1) + ' km/h'; },
+    width: function (v) { return v.toFixed(2) + ' m'; },
+    offset: function (v) { return v.toFixed(1) + ' m'; },
+    rate: function (v) { return v.toFixed(0) + ' m³/ha'; },
+    aOffset: function (v) { return v.toFixed(2) + ' m'; },
+    aSide: function (v) { return v === 0 ? '0.00 m' : Math.abs(v).toFixed(2) + ' m ' + (v > 0 ? 'rechts' : 'links'); }
+  };
+  var rec = null, saved = null, watchId = null, demoTimer = null, wakeLock = null, follow = true, lastLL = null, samples = [], clockTimer = null;
+
+  function newRec() {
+    return { origin: null, prevBoom: null, ref: null, quads: [], colors: [], track: [], cells: new Set(), sum: 0, parcels: {}, start: Date.now(), end: null, total0: null, odo: 0, lastP: null, hist: [], turning: false, turnAt: 0, turns: 0 };
+  }
+
+  // ---------- Wendemanöver erkennen ----------
+  // Wenden = Fahrtrichtung ändert sich auf den letzten 10 m Fahrstrecke um mehr als 45° (auch Rückwärtsfahren).
+  // Ende = auf den letzten 5 m wieder geradeaus (< 12°) und mindestens 6 m seit Beginn.
+  var TURN_M = 10, TURN_IN = 45, TURN_OUT_M = 5, TURN_OUT = 12;
+  function angDiff(a, b) { var d = (a - b) / D % 360; if (d > 180) d -= 360; if (d < -180) d += 360; return Math.abs(d); }
+  function headingAgo(m) { for (var i = rec.hist.length - 1; i >= 0; i--) if (rec.odo - rec.hist[i].d >= m) return rec.hist[i]; return null; }
+  function detectTurn(p, h) {
+    var v = speedAvg();
+    if (rec.lastP && v !== null && v > STAND) rec.odo += dist(rec.lastP, p);   // Zittern im Stillstand nicht mitzählen
+    rec.lastP = p;
+    if (h === null) return;
+    var last = rec.hist[rec.hist.length - 1];
+    if (!last || rec.odo - last.d >= 0.5) rec.hist.push({ d: rec.odo, h: h });
+    while (rec.hist.length > 2 && rec.odo - rec.hist[1].d > TURN_M + 2) rec.hist.shift();
+    if (!rec.turning) {
+      var a = headingAgo(TURN_M);
+      if (a && angDiff(h, a.h) > TURN_IN) { rec.turning = true; rec.turnAt = rec.odo; }
     } else {
-      arrow.hidden = true;
+      var b = headingAgo(TURN_OUT_M);
+      if (b && rec.odo - rec.turnAt >= 6 && angDiff(h, b.h) < TURN_OUT) { rec.turning = false; rec.turns++; }
     }
-    if (path) $('arrowSvg').innerHTML = path;
   }
 
-  function showMsg(text) { $('msg').textContent = text; $('msg').hidden = !text; }
-
-  function onPos(p) {
-    var c = p.coords, t = p.timestamp || Date.now(), kmh = null;
-    if (c.speed !== null && c.speed !== undefined && !isNaN(c.speed)) {
-      kmh = Math.max(0, c.speed * 3.6);
-    } else if (last) {
-      var dt = (t - last.t) / 1000;
-      if (dt > 0.5) kmh = haversine(last.c, c) / dt * 3.6;
+  // lokale Meter-Koordinaten um den ersten Punkt
+  function toXY(o, lat, lon) { return { x: (lon - o.lon) * 111320 * Math.cos(o.lat * D), y: (lat - o.lat) * 110540 }; }
+  function toLL(o, p) { return [o.lat + p.y / 110540, o.lon + p.x / (111320 * Math.cos(o.lat * D))]; }
+  function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+  function shoelace(q) { var s = 0; for (var i = 0; i < q.length; i++) { var a = q[i], b = q[(i + 1) % q.length]; s += a.x * b.y - b.x * a.y; } return Math.abs(s) / 2; }
+  function inQuad(q, x, y) {
+    var sign = 0;
+    for (var i = 0; i < 4; i++) {
+      var a = q[i], b = q[(i + 1) % 4];
+      var c = (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
+      if (c !== 0) { var s = c > 0 ? 1 : -1; if (sign === 0) sign = s; else if (s !== sign) return false; }
     }
-    last = { c: c, t: t };
-    if (kmh !== null) addSample(kmh, t);
-    var acc = Math.round(c.accuracy);
-    $('status').textContent = 'GPS aktiv';
-    $('acc').innerHTML = acc > 20 ? '<span class="warn">Signal schwach ±' + acc + ' m</span>' : 'Genauigkeit ±' + acc + ' m';
-    showMsg('');
+    return true;
+  }
+  function rasterize(r, q) {
+    var minX = Math.floor(Math.min(q[0].x, q[1].x, q[2].x, q[3].x)), maxX = Math.ceil(Math.max(q[0].x, q[1].x, q[2].x, q[3].x));
+    var minY = Math.floor(Math.min(q[0].y, q[1].y, q[2].y, q[3].y)), maxY = Math.ceil(Math.max(q[0].y, q[1].y, q[2].y, q[3].y));
+    for (var x = minX; x < maxX; x += CELL) for (var y = minY; y < maxY; y += CELL) {
+      if (inQuad(q, x + 0.5, y + 0.5)) r.cells.add(x + ',' + y);
+    }
   }
 
-  function onErr(e) {
-    var t = { 1: 'Standort-Zugriff wurde abgelehnt. Bitte in den Browser-Einstellungen erlauben.', 2: 'Kein GPS-Signal. Handy näher an die Scheibe halten.', 3: 'GPS antwortet nicht (Zeitüberschreitung).' };
-    showMsg(t[e.code] || 'GPS-Fehler: ' + e.message);
-    $('status').textContent = 'GPS-Fehler';
+  // ---------- Anzeige ----------
+  function speedAvg() {
+    if (!samples.length) return null;
+    var s = 0; samples.forEach(function (v) { s += v.v; }); return s / samples.length;
+  }
+  function stats() {
+    if (rec) {
+      var area = rec.cells.size / 10000;
+      var measured = rec.total0 !== null && flow.total !== null ? Math.max(0, flow.total - rec.total0) / 1000 : null;
+      return { area: area, overlap: rec.sum > 0 ? Math.max(0, rec.sum - rec.cells.size) / rec.sum * 100 : 0, ms: (rec.end || Date.now()) - rec.start, measured: measured, turns: rec.turns };
+    }
+    if (saved) return saved.stats;
+    return { area: 0, overlap: 0, ms: 0 };
+  }
+  function mmss(ms) { var t = Math.round(ms / 1000); var h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60; return (h ? h + ':' : '') + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0'); }
+  function render() {
+    var v = speedAvg();
+    $('sSpeed').innerHTML = (v === null ? '–' : v <= STAND ? '–' : v.toFixed(1)) + '<small>km/h</small>';
+    renderSpeed(v);
+    var st = stats();
+    $('sArea').innerHTML = st.area.toFixed(2) + '<small>ha</small>';
+    var amount = st.measured !== null && st.measured !== undefined ? st.measured : st.area * (st.rate || cfg.rate);
+    $('sAmount').innerHTML = Math.round(amount) + '<small>m³</small>';
+    $('sOverlap').innerHTML = Math.round(st.overlap) + '<small>%</small>';
+    $('acc').textContent = 'Dauer ' + mmss(st.ms);
+    var showFlow = flow.connected || (st.measured !== null && st.measured !== undefined);
+    $('flowStats').hidden = !showFlow; $('legend').hidden = !showFlow;
+    if (showFlow) {
+      $('sFlow').innerHTML = (flowLive() ? Math.round(flow.lmin).toLocaleString('de-CH').replace(/[’’]/g, "'") : '–') + '<small>l/min</small>';
+      var ar = actualRate();
+      $('sRate').innerHTML = (ar === null ? '–' : ar.toFixed(0)) + '<small>m³/ha</small>';
+      $('sMeasured').innerHTML = (st.measured !== null && st.measured !== undefined ? st.measured.toFixed(1) : '0.0') + '<small>m³</small>';
+    }
+  }
+  function setStatus(text, recording) { $('status').innerHTML = '<span class="rec-dot"></span>' + text; $('statusBar').className = 'status' + (recording ? ' rec' : ''); }
+  function showMsg(t) { $('msg').textContent = t; $('msg').hidden = !t; if (t) closeMenu(); }
+
+  // ---------- Ansicht Tempo / Karte (eine Seite: GPS, Aufzeichnung und Bluetooth laufen beim Wechseln weiter) ----------
+  function setView(v) {
+    v = v === 'tempo' ? 'tempo' : 'karte';
+    $('map').hidden = v !== 'karte';
+    $('tempoView').hidden = v !== 'tempo';
+    Array.prototype.forEach.call(document.querySelectorAll('nav.tabs a'), function (a) {
+      if (a.getAttribute('data-view') === v) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    if (v === 'karte') { map.invalidateSize(); if (follow && lastLL) map.panTo(lastLL, { animate: false }); }
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('nav.tabs a'), function (a) {
+    a.addEventListener('click', function (e) { e.preventDefault(); setView(a.getAttribute('data-view')); history.replaceState(null, '', '#' + a.getAttribute('data-view')); });
+  });
+
+  // ---------- Einstellungs-Menü (Icon oben rechts) ----------
+  function openMenu() { $('drawer').hidden = false; $('menuBtn').setAttribute('aria-expanded', 'true'); $('menuClose').focus(); }
+  function closeMenu() {
+    if ($('drawer').hidden) return;
+    $('drawer').hidden = true; $('menuBtn').setAttribute('aria-expanded', 'false'); $('menuBtn').focus();
+    map.invalidateSize();
+  }
+  $('menuBtn').addEventListener('click', function () { if ($('drawer').hidden) openMenu(); else closeMenu(); });
+  $('menuClose').addEventListener('click', closeMenu);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenu(); });
+  ['demo', 'clear'].forEach(function (id) { $(id).addEventListener('click', closeMenu); });
+
+  // ---------- Einstellungen ----------
+  function setCfg(k, v) {
+    var el = $(k), min = parseFloat(el.min), max = parseFloat(el.max);
+    v = Math.min(max, Math.max(min, Math.round(v / steps[k]) * steps[k]));
+    cfg[k] = Number(v.toFixed(2));
+    el.value = cfg[k];
+    $(k + 'Out').textContent = fmtCfg[k](cfg[k]);
+    saveCfg();
+    render();
+  }
+  function saveCfg() { try { localStorage.setItem(STORE + '-cfg', JSON.stringify(cfg)); } catch (e) {} }
+  function setSource(s) {
+    cfg.source = s === 'antenna' ? 'antenna' : 'phone';
+    var ant = cfg.source === 'antenna';
+    $('srcPhone').setAttribute('aria-pressed', String(!ant));
+    $('srcAnt').setAttribute('aria-pressed', String(ant));
+    $('rowPhone').hidden = ant; $('rowAnt').hidden = !ant; $('rowSide').hidden = !ant;
+    saveCfg();
+  }
+  function setTurnPause(on) {
+    cfg.turnPause = on !== false;
+    $('turnPause').setAttribute('aria-pressed', String(cfg.turnPause));
+    $('turnGo').setAttribute('aria-pressed', String(!cfg.turnPause));
+    saveCfg();
+  }
+  $('turnPause').addEventListener('click', function () { setTurnPause(true); });
+  $('turnGo').addEventListener('click', function () { setTurnPause(false); });
+  $('srcPhone').addEventListener('click', function () { setSource('phone'); });
+  $('srcAnt').addEventListener('click', function () { setSource('antenna'); });
+  KEYS.forEach(function (k) { $(k).addEventListener('input', function (e) { setCfg(k, parseFloat(e.target.value)); }); });
+  Array.prototype.forEach.call(document.querySelectorAll('.step'), function (b) {
+    b.addEventListener('click', function () { var k = b.getAttribute('data-k'); setCfg(k, cfg[k] + steps[k] * parseFloat(b.getAttribute('data-d'))); });
+  });
+
+  // ---------- GPS-Punkt verarbeiten ----------
+  function onFix(lat, lon, kmh, headingDeg, t, acc) {
+    lastLL = [lat, lon];
+    if (!map.hasLayer(tractor)) tractor.addTo(map);
+    tractor.setLatLng(lastLL);
+    if (follow) map.panTo(lastLL, { animate: false });
+    if (kmh !== null) { samples.push({ v: kmh, t: t }); samples = samples.filter(function (s) { return t - s.t <= WINDOW_MS; }); }
+    if (acc !== null) {
+      var accTxt = acc < 1 ? '±' + Math.max(1, Math.round(acc * 100)) + ' cm' + (acc <= 0.1 ? ' · RTK' : '') : '±' + Math.round(acc) + ' m' + (acc > 20 ? ' (schwach)' : '');
+      $('status').innerHTML = '<span class="rec-dot"></span>' + (rec ? 'Aufzeichnung' : 'GPS') + ' · ' + accTxt + (rec && rec.turning ? ' · Wenden' : '') + (rec && rec.turns ? ' · ' + rec.turns + '× gewendet' : '');
+    }
+    if (!rec) { render(); return; }
+
+    if (!rec.origin) rec.origin = { lat: lat, lon: lon };
+    var raw = toXY(rec.origin, lat, lon);
+    // GPS-Zittern glätten (gleitender Mittelwert, springt bei grossen Sprüngen nach)
+    // bei genauer Position (RTK, besser als ±0.5 m) nicht glätten
+    var precise = acc !== null && acc < 0.5;
+    var p = !precise && rec.sp && dist(rec.sp, raw) < MAX_JUMP ? { x: rec.sp.x * 0.6 + raw.x * 0.4, y: rec.sp.y * 0.6 + raw.y * 0.4 } : raw;
+    rec.sp = p;
+    rec.track.push([lat, lon]);
+    trackLine.addLatLng(lastLL);
+
+    // Fahrtrichtung: GPS-Kurs, sonst aus der Bewegung (mind. 2 m)
+    var h = null;
+    if (!rec.ref) rec.ref = p;
+    if (dist(p, rec.ref) >= (precise ? 1 : 3)) { rec.heading = Math.atan2(p.x - rec.ref.x, p.y - rec.ref.y); rec.ref = p; }
+    if (headingDeg !== null && !isNaN(headingDeg) && kmh !== null && kmh > STAND) h = headingDeg * D;
+    else if (rec.heading !== undefined) h = rec.heading;
+    detectTurn(p, h);
+
+    var v = speedAvg();
+    if (v === null || v <= STAND || h === null) { rec.prevBoom = null; boomLine.setLatLngs([]); render(); return; }
+    // mit Durchflussmesser: nur einfärben, wenn tatsächlich Gülle fliesst
+    if (flow.connected && (!flowLive() || flow.lmin < MIN_FLOW)) { rec.prevBoom = null; boomLine.setLatLngs([]); render(); return; }
+    // ohne Durchflussmesser: beim Wenden nicht einfärben (abschaltbar)
+    if (!flow.connected && rec.turning && cfg.turnPause) { rec.prevBoom = null; boomLine.setLatLngs([]); render(); return; }
+
+    var f = { x: Math.sin(h), y: Math.cos(h) }, r = { x: Math.cos(h), y: -Math.sin(h) };
+    // Verteiler-Mitte: hinter dem Positionspunkt (Abstand) und bei der Antenne ggf. seitlich versetzt
+    var ant = cfg.source === 'antenna';
+    var back = ant ? cfg.aOffset : cfg.offset, side = ant ? cfg.aSide : 0;
+    var c = { x: p.x - back * f.x - side * r.x, y: p.y - back * f.y - side * r.y };
+    var half = cfg.width / 2;
+    var bl = { x: c.x - half * r.x, y: c.y - half * r.y }, br = { x: c.x + half * r.x, y: c.y + half * r.y };
+    boomLine.setLatLngs([toLL(rec.origin, bl), toLL(rec.origin, br)]);
+
+    // erst ab 1 m Vorwärtsbewegung einen neuen Streifen anhängen
+    if (rec.prevBoom) {
+      var mv = (c.x - rec.prevBoom.c.x) * f.x + (c.y - rec.prevBoom.c.y) * f.y;
+      if (mv < 1 && dist(rec.prevBoom.c, c) < MAX_JUMP) { render(); return; }
+    }
+    if (rec.prevBoom && dist(rec.prevBoom.c, c) < MAX_JUMP) {
+      var q = [rec.prevBoom.l, rec.prevBoom.r, br, bl];
+      var ll = q.map(function (pt) { return toLL(rec.origin, pt); });
+      var col = rateColor();
+      rec.quads.push(ll); rec.colors.push(col);
+      L.polygon(ll, coverStyle(col)).addTo(coverLayer);
+      rec.sum += shoelace(q);
+      // befahrene Fläche pro Parzelle (Nummer an der Traktor-Position, inkl. Überlappung)
+      if (parcel.cur) rec.parcels[parcel.cur] = (rec.parcels[parcel.cur] || 0) + shoelace(q);
+      rasterize(rec, q);
+    }
+    rec.prevBoom = { l: bl, r: br, c: c };
+    render();
   }
 
+  // ---------- Start / Stopp ----------
   function keepAwake() {
     if (!('wakeLock' in navigator)) return;
     navigator.wakeLock.request('screen').then(function (l) { wakeLock = l; }).catch(function () {});
   }
-  document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'visible' && (watchId !== null || demoTimer)) keepAwake();
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && (rec || tempoOnly)) keepAwake(); });
+
+  // ---------- GPS: läuft während der Aufzeichnung oder bei «Nur Tempo messen» ----------
+  var tempoOnly = false;
+  function gpsCheck() {
+    if (!('geolocation' in navigator)) { showMsg('Dieses Gerät bietet kein GPS im Browser an.'); return false; }
+    if (!window.isSecureContext) { showMsg('GPS funktioniert nur, wenn die Seite über https:// geöffnet wird.'); return false; }
+    return true;
+  }
+  function startGps() {
+    if (watchId !== null) return;
+    watchId = navigator.geolocation.watchPosition(function (pos) {
+      var c = pos.coords;
+      var kmh = (c.speed !== null && c.speed !== undefined && !isNaN(c.speed)) ? Math.max(0, c.speed * 3.6) : null;
+      if (kmh === null && lastFix) {
+        var dt = (pos.timestamp - lastFix.t) / 1000;
+        if (dt > 0.5) kmh = toDistM(lastFix, c) / dt * 3.6;
+      }
+      lastFix = { lat: c.latitude, lon: c.longitude, t: pos.timestamp };
+      onFix(c.latitude, c.longitude, kmh, c.heading, pos.timestamp || Date.now(), c.accuracy);
+    }, function (e) {
+      var t = { 1: 'Standort-Zugriff wurde abgelehnt. Bitte in den Browser-Einstellungen erlauben.', 2: 'Kein GPS-Signal. Handy näher an die Scheibe halten.', 3: 'GPS antwortet nicht (Zeitüberschreitung).' };
+      showMsg(t[e.code] || 'GPS-Fehler: ' + e.message);
+    }, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+  }
+  function stopGps() {
+    if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+    lastFix = null;
+  }
+  function setTempoOnly(on) {
+    tempoOnly = on;
+    $('gpsOnly').firstElementChild.textContent = on ? 'Tempo-Messung stoppen' : 'Nur Tempo messen (ohne Aufzeichnung)';
+    if (on) { startGps(); keepAwake(); setStatus('GPS sucht …', false); return; }
+    if (rec) return;
+    stopGps(); samples = [];
+    if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
+    setStatus('Bereit', false);
+    render();
+  }
+  $('gpsOnly').addEventListener('click', function () {
+    if (tempoOnly) { setTempoOnly(false); return; }
+    if (demoTimer) finish();
+    if (gpsCheck()) { showMsg(''); setTempoOnly(true); }
   });
 
-  function stopAll() {
-    if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
-    if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
-    if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
-    samples = []; last = null; render();
-    $('status').textContent = 'GPS aus';
-    $('acc').textContent = 'Mittelwert über 5 s';
-    $('start').firstElementChild.textContent = 'GPS starten';
-    $('demo').firstElementChild.textContent = 'Demo ohne GPS';
+  function begin() {
+    if (saved && !confirm('Die gespeicherte Karte wird ersetzt. Neue Aufzeichnung starten?')) return false;
+    coverLayer.clearLayers(); trackLine.setLatLngs([]); boomLine.setLatLngs([]);
+    saved = null; samples = [];
+    rec = newRec();
+    if (flow.total !== null) rec.total0 = flow.total;
+    keepAwake();
+    clockTimer = setInterval(render, 1000);
+    $('gpsOnly').hidden = true;
+    $('startStop').className = 'btn stop';
+    $('startStop').firstElementChild.textContent = 'Aufzeichnung stoppen';
+    setStatus('Aufzeichnung', true);
+    follow = true;
+    return true;
   }
 
-  $('start').addEventListener('click', function () {
-    if (watchId !== null) { stopAll(); return; }
-    stopAll();
-    if (!('geolocation' in navigator)) { showMsg('Dieses Gerät bietet kein GPS im Browser an.'); return; }
-    if (!window.isSecureContext) { showMsg('GPS funktioniert nur, wenn die Seite über https:// geöffnet wird.'); return; }
-    $('status').textContent = 'GPS sucht …';
-    watchId = navigator.geolocation.watchPosition(onPos, onErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
-    keepAwake();
-    $('start').firstElementChild.textContent = 'GPS stoppen';
-  });
+  function finish() {
+    var wasDemo = !!demoTimer;
+    if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
+    if (!tempoOnly || wasDemo) stopGps();
+    if (clockTimer) { clearInterval(clockTimer); clockTimer = null; }
+    if (wakeLock && !tempoOnly) { wakeLock.release().catch(function () {}); wakeLock = null; }
+    if (rec) {
+      rec.end = Date.now();
+      var st = stats(); st.rate = cfg.rate;
+      saved = { quads: rec.quads, colors: rec.colors, track: rec.track, parcels: rec.parcels, stats: st, cfg: JSON.parse(JSON.stringify(cfg)), date: new Date(rec.start).toISOString() };
+      var stored = true;
+      try { localStorage.setItem(STORE, JSON.stringify(saved)); } catch (e) { stored = false; showMsg('Karte konnte auf diesem Gerät nicht gespeichert werden. Bitte herunterladen.'); }
+      rec = null;
+    }
+    boomLine.setLatLngs([]);
+    if (!tempoOnly) samples = [];
+    $('gpsOnly').hidden = false;
+    $('startStop').className = 'btn';
+    $('startStop').firstElementChild.textContent = 'Aufzeichnung starten';
+    $('demo').firstElementChild.textContent = 'Demo ohne GPS';
+    setStatus(stored === false ? 'Gestoppt · nicht gespeichert' : 'Gestoppt · gespeichert', false);
+    if (flow.fake) flow = { device: null, connected: false, lmin: null, total: null, t: 0 };
+    render();
+  }
 
+  $('startStop').addEventListener('click', function () {
+    if (rec) { finish(); return; }
+    if (!gpsCheck()) return;
+    var keep = tempoOnly ? samples : null;
+    if (!begin()) return;
+    if (keep) samples = keep;   // laufende Tempo-Messung weiterverwenden
+    showMsg('');
+    setStatus('GPS sucht …', true);
+    startGps();
+  });
+  var lastFix = null;
+  function toDistM(a, c) { var o = { lat: a.lat, lon: a.lon }; var p = toXY(o, c.latitude, c.longitude); return Math.hypot(p.x, p.y); }
+
+  // ---------- Demo: Hin- und Herfahren auf einer Wiese ----------
   $('demo').addEventListener('click', function () {
-    if (demoTimer) { stopAll(); return; }
-    stopAll();
-    var t0 = Date.now();
-    demoTimer = setInterval(function () {
-      var s = (Date.now() - t0) / 1000;
-      var v = soll + 1.6 * Math.sin(s / 8) + (Math.random() - 0.5) * 0.8;
-      addSample(Math.max(0, v), Date.now());
-    }, 1000);
-    keepAwake();
-    $('status').textContent = 'Demo (simuliert)';
+    if (demoTimer) { finish(); return; }
+    if (tempoOnly) setTempoOnly(false);
+    if (rec) finish();
+    if (!begin()) return;
     $('demo').firstElementChild.textContent = 'Demo stoppen';
+    setStatus('Demo (simuliert)', true);
+    var o = { lat: 46.8728, lon: 7.8005 }, lane = 0, along = 0, dir = 1, turn = 0, L0 = 160, v = 7 / 3.6;
+    // ohne echten Durchflussmesser: Durchfluss simulieren (Bahn 2 zu wenig, Bahn 4 zu viel)
+    var simFlow = !flow.connected;
+    if (simFlow) { flow = { device: null, connected: true, fake: true, lmin: 0, total: 0, t: Date.now() }; rec.total0 = 0; }
+    var factors = [1, 0.8, 1, 1.25, 1, 1];
+    // Wenden als Halbkreis mit 4 km/h (1 Takt = 1 s Fahrzeit)
+    var TURN_TICKS = Math.max(6, Math.round(Math.PI * cfg.width * 0.95 / 2 / (4 / 3.6)));
+    demoTimer = setInterval(function () {
+      var kmh, x, y, w = cfg.width * 0.95;
+      if (turn > 0) {
+        turn--; kmh = 4 + (Math.random() - 0.5) * 0.5;
+        var th = Math.PI * (TURN_TICKS - turn) / TURN_TICKS;
+        x = lane * w + w / 2 - w / 2 * Math.cos(th);
+        y = along + dir * w / 2 * Math.sin(th);
+        if (turn === 0) { lane++; dir = -dir; }
+      } else {
+        along += dir * v; kmh = 7 + (Math.random() - 0.5);
+        if (along > L0 || along < 0) { along = Math.max(0, Math.min(L0, along)); turn = TURN_TICKS; }
+        x = lane * w; y = along;
+      }
+      if (simFlow) {
+        var q = turn > 0 ? 0 : cfg.rate * 7 * cfg.width / 0.6 * (factors[lane] || 1);
+        flow.lmin = q; flow.total += q / 60; flow.t = Date.now();
+      }
+      x += (Math.random() - 0.5) * 1.2;
+      y += (Math.random() - 0.5) * 1.2;
+      var ll = toLL(o, { x: x, y: y });
+      onFix(ll[0], ll[1], kmh, null, Date.now(), 4);
+      if (lane > 5) finish();
+    }, 150);
   });
 
-  $('soll').addEventListener('input', function (e) { setSoll(parseFloat(e.target.value)); });
-  $('minus').addEventListener('click', function () { setSoll(soll - 0.5); });
-  $('plus').addEventListener('click', function () { setSoll(soll + 0.5); });
-  setSoll(6);
+  // ---------- Neu / Export ----------
+  $('clear').addEventListener('click', function () {
+    if (rec) return;
+    if ((saved || coverLayer.getLayers().length) && !confirm('Karte löschen und neu beginnen?')) return;
+    coverLayer.clearLayers(); trackLine.setLatLngs([]); boomLine.setLatLngs([]);
+    saved = null;
+    try { localStorage.removeItem(STORE); } catch (e) {}
+    setStatus('Bereit', false);
+    render();
+  });
+
+  function current() {
+    if (rec) return { quads: rec.quads, colors: rec.colors, track: rec.track, parcels: rec.parcels, stats: stats(), cfg: cfg, date: new Date(rec.start).toISOString() };
+    return saved;
+  }
+  function download(name, type, text) {
+    var blob = new Blob([text], { type: type });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+  }
+  function fileBase(d) { return 'guelle-karte-' + d.date.slice(0, 16).replace(/[:T]/g, '-'); }
+  function props(d) {
+    var measured = d.stats.measured !== null && d.stats.measured !== undefined;
+    return { datum: d.date, flaeche_ha: Number(d.stats.area.toFixed(3)), menge_m3: measured ? Number(d.stats.measured.toFixed(1)) : Math.round(d.stats.area * (d.stats.rate || d.cfg.rate)), menge_quelle: measured ? 'Durchflussmesser' : 'berechnet', ueberlappung_prozent: Math.round(d.stats.overlap), arbeitsbreite_m: d.cfg.width, positionsquelle: d.cfg.source === 'antenna' ? 'Antenne' : 'Handy', abstand_verteiler_m: d.cfg.source === 'antenna' ? d.cfg.aOffset : d.cfg.offset, seitlicher_versatz_m: d.cfg.source === 'antenna' ? d.cfg.aSide : 0, ausbringmenge_m3_ha: d.cfg.rate, wendemanoever: d.stats.turns || 0, parzellen: parcelList(d).map(function (x) { return x.nr; }).join(', ') };
+  }
+  // Parzellen mit befahrener Fläche, grösste zuerst
+  function parcelList(d) {
+    var o = d.parcels || {};
+    return Object.keys(o).map(function (k) { return { nr: k, ha: Number((o[k] / 10000).toFixed(3)) }; }).sort(function (a, b) { return b.ha - a.ha; });
+  }
+  function esc(s) { return String(s).replace(/[<>&]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; }); }
+  $('dlGeo').addEventListener('click', function () {
+    var d = current(); if (!d || !d.quads.length) { showMsg('Noch keine Fläche aufgezeichnet.'); return; }
+    var base = props(d);
+    base.parzellen_flaeche = parcelList(d).map(function (x) { return { parzelle: x.nr, befahren_ha: x.ha }; });
+    var features = CLASSES.map(function (cl) {
+      var qs = d.quads.filter(function (q, i) { return ((d.colors && d.colors[i]) || YELLOW) === cl.color; });
+      if (!qs.length) return null;
+      return { type: 'Feature', properties: Object.assign({ klasse: cl.name }, base), geometry: { type: 'MultiPolygon', coordinates: qs.map(function (q) { var r = q.map(function (p) { return [p[1], p[0]]; }); r.push(r[0]); return [r]; }) } };
+    }).filter(Boolean);
+    features.push({ type: 'Feature', properties: { name: 'Fahrspur' }, geometry: { type: 'LineString', coordinates: d.track.map(function (p) { return [p[1], p[0]]; }) } });
+    var gj = { type: 'FeatureCollection', features: features };
+    download(fileBase(d) + '.geojson', 'application/geo+json', JSON.stringify(gj));
+  });
+  $('dlKml').addEventListener('click', function () {
+    var d = current(); if (!d || !d.quads.length) { showMsg('Noch keine Fläche aufgezeichnet.'); return; }
+    var p = props(d);
+    function poly(q) { var r = q.concat([q[0]]); return '<Polygon><outerBoundaryIs><LinearRing><coordinates>' + r.map(function (pt) { return pt[1].toFixed(7) + ',' + pt[0].toFixed(7) + ',0'; }).join(' ') + '</coordinates></LinearRing></outerBoundaryIs></Polygon>'; }
+    var pl = parcelList(d);
+    var parcTxt = pl.length ? ' · Parzellen: ' + pl.map(function (x) { return esc(x.nr) + ' (' + x.ha.toFixed(2) + ' ha)'; }).join(', ') : '';
+    var styles = '', marks = '';
+    CLASSES.forEach(function (cl, n) {
+      var qs = d.quads.filter(function (q, i) { return ((d.colors && d.colors[i]) || YELLOW) === cl.color; });
+      if (!qs.length) return;
+      styles += '<Style id="f' + n + '"><LineStyle><width>0</width></LineStyle><PolyStyle><color>' + cl.kml + '</color><outline>0</outline></PolyStyle></Style>';
+      marks += '<Placemark><name>' + cl.name + '</name><description>Fläche ' + p.flaeche_ha + ' ha · Menge ' + p.menge_m3 + ' m³ (' + p.menge_quelle + ') · Überlappung ' + p.ueberlappung_prozent + ' % · Arbeitsbreite ' + p.arbeitsbreite_m + ' m · Soll ' + p.ausbringmenge_m3_ha + ' m³/ha · Wendemanöver ' + p.wendemanoever + parcTxt + '</description><styleUrl>#f' + n + '</styleUrl><MultiGeometry>' + qs.map(poly).join('') + '</MultiGeometry></Placemark>';
+    });
+    var line = '<LineString><coordinates>' + d.track.map(function (pt) { return pt[1].toFixed(7) + ',' + pt[0].toFixed(7) + ',0'; }).join(' ') + '</coordinates></LineString>';
+    var kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Gülle-Karte ' + p.datum.slice(0, 10) + '</name>' + styles +
+      '<Style id="t"><LineStyle><color>ffffffff</color><width>2</width></LineStyle></Style>' + marks +
+      '<Placemark><name>Fahrspur</name><styleUrl>#t</styleUrl>' + line + '</Placemark>' +
+      (pl.length ? '<ExtendedData>' + pl.map(function (x) { return '<Data name="Parzelle ' + esc(x.nr) + '"><value>' + x.ha.toFixed(3) + ' ha befahren</value></Data>'; }).join('') + '</ExtendedData>' : '') +
+      '</Document></kml>';
+    download(fileBase(d) + '.kml', 'application/vnd.google-earth.kml+xml', kml);
+  });
+
+  // ---------- Laden ----------
+  try { var c0 = JSON.parse(localStorage.getItem(STORE + '-cfg')); if (c0) cfg = Object.assign(cfg, c0); } catch (e) {}
+  KEYS.forEach(function (k) { setCfg(k, cfg[k]); });
+  setSource(cfg.source);
+  setTurnPause(cfg.turnPause);
+  setView(location.hash === '#tempo' ? 'tempo' : 'karte');   // Standard: Karte
+  try {
+    saved = JSON.parse(localStorage.getItem(STORE));
+    if (saved && saved.quads && saved.quads.length) {
+      saved.quads.forEach(function (q, i) { L.polygon(q, coverStyle(saved.colors && saved.colors[i])).addTo(coverLayer); });
+      trackLine.setLatLngs(saved.track);
+      map.fitBounds(L.latLngBounds(saved.track), { padding: [20, 20] });
+      follow = false;
+      setStatus('Letzte Karte vom ' + new Date(saved.date).toLocaleDateString('de-CH'), false);
+    } else saved = null;
+  } catch (e) { saved = null; }
+  render();
 })();
 </script>
 </body>
