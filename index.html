@@ -286,6 +286,11 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <div class="ctrl"><button class="step" type="button" data-k="blowSpread" data-d="-1" aria-label="Grenze um 1 m³/h verringern">−</button><input id="blowSpread" type="range" min="5" max="50" step="1" value="15"><button class="step" type="button" data-k="blowSpread" data-d="1" aria-label="Grenze um 1 m³/h erhöhen">+</button></div>
 <p class="note">Unter 5 m³/h gilt als kein Durchfluss. Schwankt der Durchfluss in Sekundenbruchteilen stärker als diese Grenze, wird Luft eingeblasen (Ausblasen): nicht einfärben, keine Liter zählen. Die Schwankung bei normalem Ausbringen steht oben unter «Jetzt» – die Grenze deutlich darüber setzen.</p>
 </div>
+<div class="set-row">
+<div class="set-head"><label for="flowCorr">Durchfluss-Korrektur</label><output id="flowCorrOut">0 %</output></div>
+<div class="ctrl"><button class="step" type="button" data-k="flowCorr" data-d="-1" aria-label="Korrektur um 1 % verringern">−</button><input id="flowCorr" type="range" min="-15" max="15" step="1" value="0"><button class="step" type="button" data-k="flowCorr" data-d="1" aria-label="Korrektur um 1 % erhöhen">+</button></div>
+<p class="note">Gleicht kleine Abweichungen durch die unterschiedliche Dichte der Gülle aus. Wirkt auf Durchfluss, Ist-Menge und gemessene m³. Beispiel: +3 % = Messwert × 1.03.</p>
+</div>
 </div>
 </section>
 
@@ -736,13 +741,15 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     var parts = String(text).split(';');
     var lmin = parseFloat(parts[0]), total = parseFloat(parts[1]), spread = parts.length > 2 ? parseFloat(parts[2]) : null;
     if (isNaN(lmin) || isNaN(total)) return;
+    var corr = 1 + (cfg.flowCorr || 0) / 100;   // Dichte-Korrektur, z. B. +3 % = × 1.03
+    lmin *= corr;
     flow.lmin = Math.max(0, lmin); flow.total = total; flow.t = Date.now(); flow.spread = spread;
     updateBlowing(spread);
     // Liter als Zunahmen aufsummieren: startet das Modul neu (Traktor abgestellt), beginnt sein Zähler
     // wieder bei 0 – dann zählt der neue Stand ab 0, statt die Menge zu verfälschen.
     // Unter 5 m³/h und beim Ausblasen (Luft) werden keine Liter gezählt.
     if (rec) {
-      if (rec.lastTotal !== null && flowActive()) { var d = total - rec.lastTotal; rec.liters += d >= 0 ? d : total; }
+      if (rec.lastTotal !== null && flowActive()) { var d = total - rec.lastTotal; rec.liters += (d >= 0 ? d : total) * corr; }
       rec.lastTotal = total; rec.flowSeen = true;
     }
     render();
@@ -782,10 +789,11 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   });
 
   // ---------- Zustand ----------
-  var cfg = { width: 12, offset: 3, rate: 25, speed: 6, source: 'phone', aOffset: 0, aSide: 0, turnPause: true, headingUp: false, blowSpread: 15 };
-  var KEYS = ['width', 'offset', 'rate', 'speed', 'aOffset', 'aSide', 'blowSpread'];
-  var steps = { width: 0.25, offset: 0.5, rate: 1, speed: 0.5, aOffset: 0.05, aSide: 0.05, blowSpread: 1 };
+  var cfg = { width: 12, offset: 3, rate: 25, speed: 6, source: 'phone', aOffset: 0, aSide: 0, turnPause: true, headingUp: false, blowSpread: 15, flowCorr: 0 };
+  var KEYS = ['width', 'offset', 'rate', 'speed', 'aOffset', 'aSide', 'blowSpread', 'flowCorr'];
+  var steps = { width: 0.25, offset: 0.5, rate: 1, speed: 0.5, aOffset: 0.05, aSide: 0.05, blowSpread: 1, flowCorr: 1 };
   var fmtCfg = {
+    flowCorr: function (v) { return (v > 0 ? '+' : '') + v.toFixed(0) + ' %'; },
     blowSpread: function (v) { return '±' + v.toFixed(0) + ' m³/h'; },
     speed: function (v) { return v.toFixed(1) + ' km/h'; },
     width: function (v) { return v.toFixed(2) + ' m'; },
@@ -1426,7 +1434,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   }
   function props(d) {
     var measured = d.stats.measured !== null && d.stats.measured !== undefined;
-    return { datum: d.date, flaeche_ha: Number(d.stats.area.toFixed(3)), menge_m3: measured ? Number(d.stats.measured.toFixed(1)) : Math.round(d.stats.area * (d.stats.rate || d.cfg.rate)), menge_quelle: measured ? 'Durchflussmesser' : 'berechnet', ueberlappung_prozent: Math.round(d.stats.overlap), arbeitsbreite_m: d.cfg.width, positionsquelle: d.cfg.source === 'antenna' ? 'Antenne' : 'Handy', abstand_verteiler_m: d.cfg.source === 'antenna' ? d.cfg.aOffset : d.cfg.offset, seitlicher_versatz_m: d.cfg.source === 'antenna' ? d.cfg.aSide : 0, ausbringmenge_m3_ha: d.cfg.rate, wendemanoever: d.stats.turns || 0, parzellen: parcelList(d).map(function (x) { return x.nr; }).join(', ') };
+    return { datum: d.date, flaeche_ha: Number(d.stats.area.toFixed(3)), menge_m3: measured ? Number(d.stats.measured.toFixed(1)) : Math.round(d.stats.area * (d.stats.rate || d.cfg.rate)), menge_quelle: measured ? 'Durchflussmesser' : 'berechnet', ueberlappung_prozent: Math.round(d.stats.overlap), arbeitsbreite_m: d.cfg.width, positionsquelle: d.cfg.source === 'antenna' ? 'Antenne' : 'Handy', abstand_verteiler_m: d.cfg.source === 'antenna' ? d.cfg.aOffset : d.cfg.offset, seitlicher_versatz_m: d.cfg.source === 'antenna' ? d.cfg.aSide : 0, ausbringmenge_m3_ha: d.cfg.rate, wendemanoever: d.stats.turns || 0, durchfluss_korrektur_prozent: d.cfg.flowCorr || 0, parzellen: parcelList(d).map(function (x) { return x.nr; }).join(', ') };
   }
   // Parzellen mit befahrener Fläche, grösste zuerst
   function parcelList(d) {
