@@ -227,7 +227,11 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <div class="set-head"><label for="rate">Ausbringmenge</label><output id="rateOut">25 m³/ha</output></div>
 <div class="ctrl"><button class="step" type="button" data-k="rate" data-d="-1" aria-label="Ausbringmenge um 1 m³/ha verringern">−</button><input id="rate" type="range" min="0" max="100" step="1" value="25"><button class="step" type="button" data-k="rate" data-d="1" aria-label="Ausbringmenge um 1 m³/ha erhöhen">+</button></div>
 </div>
-<div class="set-row">
+<div class="set-row" id="rowSpeedFlow" hidden>
+<div class="set-head"><span class="lbl">Soll-Geschwindigkeit</span><output id="speedFlowOut">–</output></div>
+<p class="note">Berechnet aus Durchfluss, Ausbringmenge und Arbeitsbreite – muss nicht eingestellt werden.</p>
+</div>
+<div class="set-row" id="rowSpeed">
 <div class="set-head"><label for="speed">Soll-Geschwindigkeit</label><output id="speedOut">6.0 km/h</output></div>
 <div class="ctrl"><button class="step" type="button" data-k="speed" data-d="-1" aria-label="Soll-Geschwindigkeit um 0.5 km/h verringern">−</button><input id="speed" type="range" min="0" max="15" step="0.5" value="6"><button class="step" type="button" data-k="speed" data-d="1" aria-label="Soll-Geschwindigkeit um 0.5 km/h erhöhen">+</button></div>
 <p class="note">Mit verbundenem Durchflussmesser wird die Soll-Geschwindigkeit aus Durchfluss, Ausbringmenge und Arbeitsbreite berechnet. Traktor-Punkt auf der Karte: Ring läuft nach innen = zu schnell, nach aussen = zu langsam, je öfter, desto grösser die Abweichung. Gelb ohne Ring = im Bereich ±0.5 km/h. Grau = Wenden, gelb, gross und leicht pulsierend = Stillstand, hohl = kein GPS.</p>
@@ -618,16 +622,23 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   }
   function renderSpeed(v) {
     var s = sollSpeed(), st = speedState(v, s.v);
+    // mit Durchflussmesser: Regler ausblenden, berechneten Wert zeigen (ohne Durchfluss, z. B. Pumpe aus: «–»)
+    $('rowSpeed').hidden = flow.connected; $('rowSpeedFlow').hidden = !flow.connected;
+    if (flow.connected) $('speedFlowOut').textContent = s.flow ? s.v.toFixed(1) + ' km/h' : '–';
+    // Durchflussmesser verbunden, aber kein Durchfluss: kein Sollwert, also auch kein Ring/Pfeil
+    var noSoll = flow.connected && !s.flow;
+    if (noSoll && st !== 'stop') st = st === null ? null : 'ok';
+    var sollTxt = noSoll ? '–' : s.v.toFixed(1);
     var txt = { up: 'schneller', down: 'langsamer', stop: 'Stillstand', ok: 'im Soll' };
     speedBox.hidden = v === null;
     if (v !== null) {
-      speedBox.innerHTML = '<span>Tempo</span><b>' + (v <= STAND ? '–' : v.toFixed(1)) + '</b><small>km/h</small><em>· Soll ' + s.v.toFixed(1) + '</em>';
+      speedBox.innerHTML = '<span>Tempo</span><b>' + (v <= STAND ? '–' : v.toFixed(1)) + '</b><small>km/h</small><em>· Soll ' + sollTxt + '</em>';
       speedBox.setAttribute('aria-label', 'Tempo ' + (v <= STAND ? 'Stillstand' : v.toFixed(1) + ' km/h, ' + txt[st]));
     }
     // Tempo-Ansicht (grosse Anzeige)
     $('ist').textContent = v === null || v <= STAND ? '–' : v.toFixed(1);
     var turning = !!(rec && rec.turning), off = !!(rec && rec.spreadOff);
-    $('sollLine').textContent = 'Soll ' + s.v.toFixed(1) + ' km/h · ±' + TOL + (s.flow ? ' · aus Durchfluss' : '') + (turning ? ' · Wenden' : '') + (off ? ' · Ausbringen aus' : '');
+    $('sollLine').textContent = (noSoll ? 'Soll – (kein Durchfluss)' : 'Soll ' + sollTxt + ' km/h · ±' + TOL) + (s.flow ? ' · aus Durchfluss' : '') + (turning ? ' · Wenden' : '') + (off ? ' · Ausbringen aus' : '');
     // beim Wenden und bei «Ausbringen aus» wie auf der Karte kein Pfeil
     var big = !!(st && st !== 'ok' && !turning && !off);
     $('arrow').hidden = !big;
