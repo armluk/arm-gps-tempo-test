@@ -196,7 +196,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <div class="stat"><b id="sOverlap">0<small>%</small></b><span>Überlappt</span></div>
 </div>
 <div class="stats three" id="flowStats" hidden aria-live="polite">
-<div class="stat"><b id="sFlow">–<small>l/min</small></b><span>Durchfluss</span></div>
+<div class="stat"><b id="sFlow">–<small>m³/h</small></b><span>Durchfluss</span></div>
 <div class="stat"><b id="sRate">–<small>m³/ha</small></b><span>Ist-Menge</span></div>
 <div class="stat"><b id="sMeasured">0.0<small>m³</small></b><span>Gemessen</span></div>
 </div>
@@ -886,7 +886,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (showFlow) {
       // unter 5 m³/h «–», beim Ausblasen «Luft»
       $('sFlow').innerHTML = flowLive() && flow.blowing ? 'Luft<small>Ausblasen</small>'
-        : (flowActive() ? Math.round(flow.lmin).toLocaleString('de-CH').replace(/[’’]/g, "'") : '–') + '<small>l/min</small>';
+        : (flowActive() ? Math.round(flow.lmin * 0.06) : '–') + '<small>m³/h</small>';   // l/min × 0.06 = m³/h
       var fi = $('flowInfo');
       if (fi) fi.textContent = flowLive() ? 'Jetzt: ' + Math.round(flow.lmin * 0.06) + ' m³/h' + (flow.spread !== null && !isNaN(flow.spread) ? ' · Schwankung ±' + Math.round(flow.spread) + ' m³/h' : ' · Schwankung: Modul-Software zu alt') + (flow.blowing ? ' · Ausblasen erkannt' : flowActive() ? '' : ' · kein Durchfluss') : 'Kein Messwert.';
       var ar = actualRate();
