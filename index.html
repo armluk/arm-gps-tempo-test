@@ -51,6 +51,8 @@ nav.tabs a[aria-current]{color:#fff;border-bottom-color:var(--yellow)}
 .stat b small{font-size:11px;font-weight:700;margin-left:2px}
 .stat span{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--on-dark)}
 .stats.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.stats.three.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.stat[hidden]{display:none}
 .stats[hidden],.legend[hidden]{display:none}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;font-weight:600;color:var(--on-dark)}
 .legend i{display:inline-block;width:12px;height:12px;margin-right:6px;vertical-align:-1px;border:1px solid var(--fuge)}
@@ -190,13 +192,13 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 
 <section class="panel">
 <div class="stats" aria-live="polite">
-<div class="stat"><b id="sSpeed">–<small>km/h</small></b><span>Tempo</span></div>
+<div class="stat"><b id="sSpeed">–<small>km/h</small></b><span id="sSpeedLbl">Tempo</span></div>
 <div class="stat"><b id="sArea">0.00<small>ha</small></b><span>Fläche</span></div>
 <div class="stat"><b id="sAmount">0<small>m³</small></b><span>Menge</span></div>
 <div class="stat"><b id="sOverlap">0<small>%</small></b><span>Überlappt</span></div>
 </div>
 <div class="stats three" id="flowStats" hidden aria-live="polite">
-<div class="stat"><b id="sFlow">–<small>m³/h</small></b><span>Durchfluss</span></div>
+<div class="stat" id="sFlowTile"><b id="sFlow">–<small>m³/h</small></b><span>Durchfluss</span></div>
 <div class="stat"><b id="sRate">–<small>m³/ha</small></b><span>Ist-Menge</span></div>
 <div class="stat"><b id="sMeasured">0.0<small>m³</small></b><span>Gemessen</span></div>
 </div>
@@ -872,7 +874,14 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   function mmss(ms) { var t = Math.round(ms / 1000); var h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60; return (h ? h + ':' : '') + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0'); }
   function render() {
     var v = speedAvg();
-    $('sSpeed').innerHTML = (v === null ? '–' : v <= STAND ? '–' : v.toFixed(1)) + '<small>km/h</small>';
+    // mit Durchflussmesser: erstes Feld zeigt den Durchfluss – das Tempo steht auf der Karte (Feld unten rechts)
+    var flowFirst = flow.connected;
+    var flowHtml = flowLive() && flow.blowing ? 'Luft<small>Ausblasen</small>'
+      : (flowActive() ? Math.round(flow.lmin * 0.06) : '–') + '<small>m³/h</small>';   // l/min × 0.06 = m³/h; unter 5 m³/h «–»
+    $('sSpeed').innerHTML = flowFirst ? flowHtml : (v === null ? '–' : v <= STAND ? '–' : v.toFixed(1)) + '<small>km/h</small>';
+    $('sSpeedLbl').textContent = flowFirst ? 'Durchfluss' : 'Tempo';
+    $('sFlowTile').hidden = flowFirst;
+    $('flowStats').classList.toggle('two', flowFirst);
     renderSpeed(v);
     var st = stats();
     $('sArea').innerHTML = st.area.toFixed(2) + '<small>ha</small>';
@@ -884,9 +893,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     var showFlow = flow.connected || (st.measured !== null && st.measured !== undefined);
     $('flowStats').hidden = !showFlow; $('legend').hidden = !showFlow;
     if (showFlow) {
-      // unter 5 m³/h «–», beim Ausblasen «Luft»
-      $('sFlow').innerHTML = flowLive() && flow.blowing ? 'Luft<small>Ausblasen</small>'
-        : (flowActive() ? Math.round(flow.lmin * 0.06) : '–') + '<small>m³/h</small>';   // l/min × 0.06 = m³/h
+      $('sFlow').innerHTML = flowHtml;
       var fi = $('flowInfo');
       if (fi) fi.textContent = flowLive() ? 'Jetzt: ' + Math.round(flow.lmin * 0.06) + ' m³/h' + (flow.spread !== null && !isNaN(flow.spread) ? ' · Schwankung ±' + Math.round(flow.spread) + ' m³/h' : ' · Schwankung: Modul-Software zu alt') + (flow.blowing ? ' · Ausblasen erkannt' : flowActive() ? '' : ' · kein Durchfluss') : 'Kein Messwert.';
       var ar = actualRate();
