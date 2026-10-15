@@ -331,11 +331,12 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       var a = L.DomUtil.create('a', 'center-btn', div);
       a.href = '#'; a.title = 'Auf Traktor zentrieren'; a.setAttribute('role', 'button'); a.setAttribute('aria-label', 'Auf Traktor zentrieren');
       a.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>';
-      L.DomEvent.on(a, 'click', function (e) { L.DomEvent.preventDefault(e); follow = true; setDetail(false); if (lastLL) centerOnTractor(); });
+      L.DomEvent.on(a, 'click', function (e) { L.DomEvent.preventDefault(e); follow = true; setDetail(false); centerOnTractor(); });
       var z = L.DomUtil.create('a', 'center-btn', div);
       z.id = 'detailBtn'; z.href = '#'; z.title = 'Verteiler gross anzeigen'; z.setAttribute('role', 'button'); z.setAttribute('aria-label', 'Verteiler gross anzeigen'); z.setAttribute('aria-pressed', 'false');
       z.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M15 15l7 7M10 6.5v7M6.5 10h7"/></svg>';
-      L.DomEvent.on(z, 'click', function (e) { L.DomEvent.preventDefault(e); setDetail(!detail); });
+      // nochmals drücken = zurück auf den 200-m-Ausschnitt
+      L.DomEvent.on(z, 'click', function (e) { L.DomEvent.preventDefault(e); if (detail) { setDetail(false); centerOnTractor(); } else setDetail(true); });
       var n = L.DomUtil.create('a', 'center-btn', div);
       n.id = 'northBtn'; n.href = '#'; n.title = 'Fahrtrichtung oben / Norden oben'; n.setAttribute('role', 'button'); n.setAttribute('aria-label', 'Karte in Fahrtrichtung drehen'); n.setAttribute('aria-pressed', 'false');
       // Nadel zeigt immer nach Norden (dreht mit der Karte)
@@ -349,7 +350,8 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   // Auf Traktor zentrieren: Ausschnitt etwa 200 m (schmale Seite der Karte)
   var CENTER_M = 200;
   function centerOnTractor() {
-    var ll = L.latLng(lastLL);
+    // ohne GPS (App eben geöffnet, noch keine Aufzeichnung): auf die Kartenmitte
+    var ll = disp.ll || (lastLL ? L.latLng(lastLL) : map.getCenter());
     map.setView(ll, map.getBoundsZoom(ll.toBounds(CENTER_M)), { animate: false });
   }
   // Detail-Ansicht: feste Zoomstufe nur aus der Arbeitsbreite – der Verteiler füllt 50 % der Kartenbreite.
