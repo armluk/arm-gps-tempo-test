@@ -8,7 +8,8 @@
 // Software: Arduino IDE mit «esp32 by Espressif Systems» (Boardverwalter), Board «XIAO_ESP32C3».
 //           Keine weiteren Bibliotheken nötig.
 //
-// Gesendeter Wert (Text): "<Liter pro Minute>;<Liter gesamt seit Einschalten>", z. B. "2950;18420"
+// Gesendeter Wert (Text): "<Liter pro Minute>;<Liter gesamt seit Einschalten>;<Schwankung ± m³/h>", z. B. "2950;18420;3"
+// Die Schwankung kommt aus den Abständen der einzelnen Impulse in der letzten Sekunde (Erkennung «Ausblasen»).
 
 #include <BLEDevice.h>
 #include <BLEServer.h>
@@ -28,10 +29,13 @@ const uint32_t SLOT_MS          = 250;
 // ---------- Impulse zählen ----------
 volatile uint32_t impulse = 0;
 volatile uint32_t letzterImpulsUs = 0;
+const int NZEIT = 256;                       // Zeitpunkte der letzten Impulse (reicht bis ca. 900 m³/h)
+volatile uint32_t impulsZeit[NZEIT];
 
 void IRAM_ATTR beiImpuls() {
   uint32_t jetzt = micros();
   if (jetzt - letzterImpulsUs >= ENTPRELL_US) {
+    impulsZeit[impulse % NZEIT] = jetzt;
     impulse++;
     letzterImpulsUs = jetzt;
   }
@@ -39,6 +43,23 @@ void IRAM_ATTR beiImpuls() {
 
 uint32_t leseImpulse() {
   return impulse;  // 32-Bit-Lesen ist auf dem ESP32-C3 atomar
+}
+
+// Schwankung des Durchflusses in der letzten Sekunde, in ± m³/h (halbe Spanne zwischen 10 % und 90 %)
+float schwankung() {
+  static float q[NZEIT];
+  uint32_t n = leseImpulse(), jetzt = micros();
+  int k = 0;
+  for (int32_t j = 0; j < NZEIT - 2 && (int32_t)n - 1 - j >= 1; j++) {
+    uint32_t i = n - 1 - j;
+    uint32_t t1 = impulsZeit[i % NZEIT], t0 = impulsZeit[(i - 1) % NZEIT];
+    if (jetzt - t0 > 1000000UL) break;
+    uint32_t d = t1 - t0;
+    if (d > 0) q[k++] = 3.6e6f * LITER_PRO_IMPULS / d;
+  }
+  if (k < 4) return 0;
+  for (int a = 1; a < k; a++) { float v = q[a]; int b = a - 1; while (b >= 0 && q[b] > v) { q[b + 1] = q[b]; b--; } q[b + 1] = v; }
+  return (q[k * 9 / 10] - q[k / 10]) / 2;
 }
 
 // ---------- Bluetooth ----------
@@ -107,7 +128,7 @@ void loop() {
     float lmin = dt > 0 ? (n - zaehler[alt]) * LITER_PRO_IMPULS * 60000.0f / dt : 0;
 
     char text[32];
-    snprintf(text, sizeof(text), "%.0f;%lu", lmin, (unsigned long)(n * LITER_PRO_IMPULS));
+    snprintf(text, sizeof(text), "%.0f;%lu;%.0f", lmin, (unsigned long)(n * LITER_PRO_IMPULS), schwankung());
     wert->setValue(text);
     if (verbunden) wert->notify();
     Serial.println(text);

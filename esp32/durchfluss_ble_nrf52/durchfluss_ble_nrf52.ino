@@ -9,7 +9,10 @@
 // Software: Arduino IDE, Boardverwalter-URL von Seeed eintragen und «Seeed nRF52 Boards» installieren,
 //           Board «Seeed XIAO nRF52840» wählen (nicht die «mbed»-Variante – nur diese enthält «bluefruit.h»).
 //
-// Gesendeter Wert (Text): "<Liter pro Minute>;<Liter gesamt seit Einschalten>", z. B. "2950;18420"
+// Gesendeter Wert (Text): "<Liter pro Minute>;<Liter gesamt seit Einschalten>;<Schwankung ± m³/h>", z. B. "2950;18420;3"
+// Die Schwankung kommt aus den Abständen der einzelnen Impulse in der letzten Sekunde. Schwankt der
+// Durchfluss in Sekundenbruchteilen stark (z. B. ±20 m³/h), wird Luft zum Reinigen eingeblasen
+// («Ausblasen») – die App wertet das dann nicht als Durchfluss.
 
 #include <bluefruit.h>
 
@@ -32,10 +35,13 @@ BLECharacteristic wert(WERT_UUID);
 // ---------- Impulse zählen ----------
 volatile uint32_t impulse = 0;
 volatile uint32_t letzterImpulsUs = 0;
+const int NZEIT = 256;                       // Zeitpunkte der letzten Impulse (reicht bis ca. 900 m³/h)
+volatile uint32_t impulsZeit[NZEIT];
 
 void beiImpuls() {
   uint32_t jetzt = micros();
   if (jetzt - letzterImpulsUs >= ENTPRELL_US) {
+    impulsZeit[impulse % NZEIT] = jetzt;
     impulse++;
     letzterImpulsUs = jetzt;
   }
@@ -43,6 +49,24 @@ void beiImpuls() {
 
 uint32_t leseImpulse() {
   return impulse;  // 32-Bit-Lesen ist auf dem nRF52840 atomar
+}
+
+// Schwankung des Durchflusses in der letzten Sekunde, in ± m³/h:
+// Momentan-Durchfluss aus jedem Impulsabstand, dann halbe Spanne zwischen 10 % und 90 % (robust gegen Ausreisser).
+float schwankung() {
+  static float q[NZEIT];
+  uint32_t n = leseImpulse(), jetzt = micros();
+  int k = 0;
+  for (int32_t j = 0; j < NZEIT - 2 && (int32_t)n - 1 - j >= 1; j++) {
+    uint32_t i = n - 1 - j;
+    uint32_t t1 = impulsZeit[i % NZEIT], t0 = impulsZeit[(i - 1) % NZEIT];
+    if (jetzt - t0 > 1000000UL) break;       // nur Abstände ganz innerhalb der letzten Sekunde
+    uint32_t d = t1 - t0;
+    if (d > 0) q[k++] = 3.6e6f * LITER_PRO_IMPULS / d;   // 1 Liter in d µs -> m³/h
+  }
+  if (k < 4) return 0;
+  for (int a = 1; a < k; a++) { float v = q[a]; int b = a - 1; while (b >= 0 && q[b] > v) { q[b + 1] = q[b]; b--; } q[b + 1] = v; }
+  return (q[k * 9 / 10] - q[k / 10]) / 2;
 }
 
 // ---------- Ringpuffer für den Mittelwert ----------
@@ -107,7 +131,8 @@ void loop() {
     float lmin = dt > 0 ? (n - zaehler[alt]) * LITER_PRO_IMPULS * 60000.0f / dt : 0;
 
     char text[32];
-    snprintf(text, sizeof(text), "%lu;%lu", (unsigned long)(lmin + 0.5f), (unsigned long)(n * LITER_PRO_IMPULS));
+    snprintf(text, sizeof(text), "%lu;%lu;%lu", (unsigned long)(lmin + 0.5f), (unsigned long)(n * LITER_PRO_IMPULS),
+             (unsigned long)(schwankung() + 0.5f));
     wert.write(text);
     if (Bluefruit.connected()) wert.notify(text);
     Serial.println(text);

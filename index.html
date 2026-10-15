@@ -278,6 +278,12 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <h2>Durchflussmesser</h2>
 <div class="set">
 <button class="btn line" id="flowBtn" type="button"><span>Durchflussmesser verbinden</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
+<p class="note" id="flowInfo">Kein Messwert.</p>
+<div class="set-row">
+<div class="set-head"><label for="blowSpread">Ausblasen erkennen ab Schwankung</label><output id="blowSpreadOut">±15 m³/h</output></div>
+<div class="ctrl"><button class="step" type="button" data-k="blowSpread" data-d="-1" aria-label="Grenze um 1 m³/h verringern">−</button><input id="blowSpread" type="range" min="5" max="50" step="1" value="15"><button class="step" type="button" data-k="blowSpread" data-d="1" aria-label="Grenze um 1 m³/h erhöhen">+</button></div>
+<p class="note">Unter 5 m³/h gilt als kein Durchfluss. Schwankt der Durchfluss in Sekundenbruchteilen stärker als diese Grenze, wird Luft eingeblasen (Ausblasen): nicht einfärben, keine Liter zählen. Die Schwankung bei normalem Ausbringen steht oben unter «Jetzt» – die Grenze deutlich darüber setzen.</p>
+</div>
 </div>
 </section>
 
@@ -612,7 +618,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   var speedBox = new SpeedCtl().addTo(map).getContainer();
   // Soll: aus dem Durchfluss (Tempo, bei dem die Ist-Menge der Ausbringmenge entspricht), sonst Einstellung
   function sollSpeed() {
-    if (flowLive() && flow.lmin >= MIN_FLOW && cfg.rate > 0 && cfg.width > 0) return { v: flow.lmin * 0.6 / (cfg.rate * cfg.width), flow: true };
+    if (flowActive() && cfg.rate > 0 && cfg.width > 0) return { v: flow.lmin * 0.6 / (cfg.rate * cfg.width), flow: true };
     return { v: cfg.speed, flow: false };
   }
   function speedState(v, soll) {
@@ -693,12 +699,23 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 
   // ---------- Durchflussmesser (Bluetooth LE, ESP32) ----------
   var FLOW_SVC = '6b1f0001-4a3b-4d52-9a2e-3c1d5e7f8a90', FLOW_CHR = '6b1f0002-4a3b-4d52-9a2e-3c1d5e7f8a90';
-  var MIN_FLOW = 20, FLOW_STALE_MS = 5000;
-  var flow = { device: null, connected: false, lmin: null, total: null, t: 0 };
+  // unter 5 m³/h gilt als kein Durchfluss (5 m³/h = 83.3 l/min)
+  var MIN_FLOW = 5000 / 60, FLOW_STALE_MS = 5000;
+  function newFlow(extra) { return Object.assign({ device: null, connected: false, lmin: null, total: null, t: 0, spread: null, blowing: false, hi: 0, lo: 0 }, extra || {}); }
+  var flow = newFlow();
   function flowLive() { return flow.connected && flow.lmin !== null && Date.now() - flow.t < FLOW_STALE_MS; }
+  // echter Gülle-Durchfluss: Messwert aktuell, mindestens 5 m³/h und kein Ausblasen
+  function flowActive() { return flowLive() && flow.lmin >= MIN_FLOW && !flow.blowing; }
+  // Ausblasen (Luft reinigt die Leitungen): Durchfluss schwankt in Sekundenbruchteilen stark.
+  // Beginnt nach 2 unruhigen Sekunden, endet nach 3 ruhigen – damit es nicht hin und her springt.
+  function updateBlowing(spread) {
+    if (spread === null || isNaN(spread)) { flow.blowing = false; return; }   // ältere Modul-Software ohne Schwankung
+    if (spread >= cfg.blowSpread) { flow.hi++; flow.lo = 0; if (flow.hi >= 2) flow.blowing = true; }
+    else { flow.lo++; flow.hi = 0; if (flow.lo >= 3) flow.blowing = false; }
+  }
   function actualRate() {
     var v = speedAvg();
-    if (!flowLive() || v === null || v <= STAND || cfg.width <= 0) return null;
+    if (!flowActive() || v === null || v <= STAND || cfg.width <= 0) return null;
     return flow.lmin * 0.6 / (v * cfg.width);   // m³/ha = l/min × 0.6 ÷ (km/h × m)
   }
   function rateColor() {
@@ -715,13 +732,15 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 
   function onFlowValue(text) {
     var parts = String(text).split(';');
-    var lmin = parseFloat(parts[0]), total = parseFloat(parts[1]);
+    var lmin = parseFloat(parts[0]), total = parseFloat(parts[1]), spread = parts.length > 2 ? parseFloat(parts[2]) : null;
     if (isNaN(lmin) || isNaN(total)) return;
-    flow.lmin = Math.max(0, lmin); flow.total = total; flow.t = Date.now();
+    flow.lmin = Math.max(0, lmin); flow.total = total; flow.t = Date.now(); flow.spread = spread;
+    updateBlowing(spread);
     // Liter als Zunahmen aufsummieren: startet das Modul neu (Traktor abgestellt), beginnt sein Zähler
     // wieder bei 0 – dann zählt der neue Stand ab 0, statt die Menge zu verfälschen.
+    // Unter 5 m³/h und beim Ausblasen (Luft) werden keine Liter gezählt.
     if (rec) {
-      if (rec.lastTotal !== null) { var d = total - rec.lastTotal; rec.liters += d >= 0 ? d : total; }
+      if (rec.lastTotal !== null && flowActive()) { var d = total - rec.lastTotal; rec.liters += d >= 0 ? d : total; }
       rec.lastTotal = total; rec.flowSeen = true;
     }
     render();
@@ -761,10 +780,11 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   });
 
   // ---------- Zustand ----------
-  var cfg = { width: 12, offset: 3, rate: 25, speed: 6, source: 'phone', aOffset: 0, aSide: 0, turnPause: true, headingUp: false };
-  var KEYS = ['width', 'offset', 'rate', 'speed', 'aOffset', 'aSide'];
-  var steps = { width: 0.25, offset: 0.5, rate: 1, speed: 0.5, aOffset: 0.05, aSide: 0.05 };
+  var cfg = { width: 12, offset: 3, rate: 25, speed: 6, source: 'phone', aOffset: 0, aSide: 0, turnPause: true, headingUp: false, blowSpread: 15 };
+  var KEYS = ['width', 'offset', 'rate', 'speed', 'aOffset', 'aSide', 'blowSpread'];
+  var steps = { width: 0.25, offset: 0.5, rate: 1, speed: 0.5, aOffset: 0.05, aSide: 0.05, blowSpread: 1 };
   var fmtCfg = {
+    blowSpread: function (v) { return '±' + v.toFixed(0) + ' m³/h'; },
     speed: function (v) { return v.toFixed(1) + ' km/h'; },
     width: function (v) { return v.toFixed(2) + ' m'; },
     offset: function (v) { return v.toFixed(1) + ' m'; },
@@ -864,7 +884,11 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     var showFlow = flow.connected || (st.measured !== null && st.measured !== undefined);
     $('flowStats').hidden = !showFlow; $('legend').hidden = !showFlow;
     if (showFlow) {
-      $('sFlow').innerHTML = (flowLive() ? Math.round(flow.lmin).toLocaleString('de-CH').replace(/[’’]/g, "'") : '–') + '<small>l/min</small>';
+      // unter 5 m³/h «–», beim Ausblasen «Luft»
+      $('sFlow').innerHTML = flowLive() && flow.blowing ? 'Luft<small>Ausblasen</small>'
+        : (flowActive() ? Math.round(flow.lmin).toLocaleString('de-CH').replace(/[’’]/g, "'") : '–') + '<small>l/min</small>';
+      var fi = $('flowInfo');
+      if (fi) fi.textContent = flowLive() ? 'Jetzt: ' + Math.round(flow.lmin * 0.06) + ' m³/h' + (flow.spread !== null && !isNaN(flow.spread) ? ' · Schwankung ±' + Math.round(flow.spread) + ' m³/h' : ' · Schwankung: Modul-Software zu alt') + (flow.blowing ? ' · Ausblasen erkannt' : flowActive() ? '' : ' · kein Durchfluss') : 'Kein Messwert.';
       var ar = actualRate();
       $('sRate').innerHTML = (ar === null ? '–' : ar.toFixed(0)) + '<small>m³/ha</small>';
       $('sMeasured').innerHTML = (st.measured !== null && st.measured !== undefined ? st.measured.toFixed(1) : '0.0') + '<small>m³</small>';
@@ -977,7 +1001,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     // «Ausbringen aus» (z. B. Fahrt zur Güllegrube): nichts einfärben
     if (rec.spreadOff) { rec.prevBoom = null; boomTo(null); render(); return; }
     // mit Durchflussmesser: nur einfärben, wenn tatsächlich Gülle fliesst
-    if (flow.connected && (!flowLive() || flow.lmin < MIN_FLOW)) { rec.prevBoom = null; boomTo(null); render(); return; }
+    if (flow.connected && !flowActive()) { rec.prevBoom = null; boomTo(null); render(); return; }
     // ohne Durchflussmesser: beim Wenden nicht einfärben (abschaltbar)
     if (!flow.connected && rec.turning && cfg.turnPause) { rec.prevBoom = null; boomTo(null); render(); return; }
 
@@ -1284,7 +1308,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     $('gpsOnly').hidden = false;
     $('demo').firstElementChild.textContent = 'Demo ohne GPS';
     setStatus(wasDemo ? 'Demo beendet' : stored === false ? 'Gestoppt · nicht gespeichert' : 'Gestoppt · gespeichert', false);
-    if (flow.fake) flow = { device: null, connected: false, lmin: null, total: null, t: 0 };
+    if (flow.fake) flow = newFlow();
     updateActions();
     render();
   }
@@ -1329,7 +1353,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (tempoOnly) setTempoOnly(false);
     // ohne echten Durchflussmesser: Durchfluss simulieren (Bahn 2 zu wenig, Bahn 4 zu viel)
     var simFlow = !flow.connected;
-    if (simFlow) flow = { device: null, connected: true, fake: true, lmin: 0, total: 0, t: Date.now() };
+    if (simFlow) flow = newFlow({ connected: true, fake: true, lmin: 0, total: 0, t: Date.now() });
     begin(true);
     $('demo').firstElementChild.textContent = 'Demo stoppen';
     setStatus('Demo (simuliert)', true);
@@ -1351,9 +1375,11 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
         x = lane * w; y = along;
       }
       if (simFlow) {
-        var q = turn > 0 ? 0 : cfg.rate * 7 * cfg.width / 0.6 * (factors[lane] || 1);
+        // in der Kehre: Ausblasen simulieren (Luft – Durchfluss springt wild, Schwankung über ±20 m³/h)
+        var q = turn > 0 ? 200 + Math.random() * 400 : cfg.rate * 7 * cfg.width / 0.6 * (factors[lane] || 1);
+        var spread = turn > 0 ? 22 + Math.random() * 8 : 1 + Math.random() * 3;
         simTotal += q / 60;
-        onFlowValue(q + ';' + simTotal);       // wie eine Meldung vom Modul
+        onFlowValue(Math.round(q) + ';' + Math.round(simTotal) + ';' + Math.round(spread));   // wie eine Meldung vom Modul
       }
       x += (Math.random() - 0.5) * 1.2;
       y += (Math.random() - 0.5) * 1.2;
