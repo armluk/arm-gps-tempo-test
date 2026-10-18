@@ -23,7 +23,14 @@ const uint32_t ENTPRELL_US      = 2000;  // Impulse kürzer als 2 ms Abstand ign
 const uint32_t FENSTER_MS       = 3000;  // Durchfluss = Mittelwert über die letzten 3 Sekunden
 const uint32_t SLOT_MS          = 250;
 
-#define GERAETENAME "Guelle-Durchfluss"
+// Bluetooth-Name «SpreadLink-1234»: die 4-stellige Nummer kommt aus der einmaligen Seriennummer des Chips
+// (FICR DEVICEID) – jedes Modul hat so automatisch seine eigene Nummer, die auch nach Updates gleich bleibt.
+#define NAMENSTEIL "SpreadLink-"
+char geraetename[24];
+uint16_t geraeteNummer() {
+  uint32_t id = NRF_FICR->DEVICEID[0] ^ NRF_FICR->DEVICEID[1];
+  return id % 10000;
+}
 
 // UUIDs wie in der ESP32-Version (6b1f0001-/6b1f0002-4a3b-4d52-9a2e-3c1d5e7f8a90), Bytes rückwärts
 const uint8_t SERVICE_UUID[16] = { 0x90, 0x8a, 0x7f, 0x5e, 0x1d, 0x3c, 0x2e, 0x9a, 0x52, 0x4d, 0x3b, 0x4a, 0x01, 0x00, 0x1f, 0x6b };
@@ -91,7 +98,8 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(IMPULS_PIN), beiImpuls, FALLING);
 
   Bluefruit.begin();
-  Bluefruit.setName(GERAETENAME);
+  snprintf(geraetename, sizeof(geraetename), NAMENSTEIL "%04u", geraeteNummer());
+  Bluefruit.setName(geraetename);
   Bluefruit.setTxPower(4);  // maximale Sendeleistung für Reichweite bis in die Kabine
 
   dienst.begin();
@@ -106,7 +114,8 @@ void setup() {
   zaehler[0] = 0;
   zeit[0] = millis();
   pos = 1;
-  Serial.println("Durchfluss-Sender bereit");
+  Serial.print("Durchfluss-Sender bereit: ");
+  Serial.println(geraetename);
 }
 
 uint32_t naechsterSlot = 0;

@@ -777,28 +777,54 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
         chr.addEventListener('characteristicvaluechanged', function (e) { onFlowValue(new TextDecoder().decode(e.target.value)); });
         return chr.startNotifications();
       })
-      .then(function () { flow.connected = true; if (rec) rec.spreadOff = false; setFlowBtn('Durchflussmesser verbunden ✓'); showMsg(''); render(); });
+      .then(function () {
+        flow.connected = true; if (rec) rec.spreadOff = false;
+        var name = flow.device.name || 'Durchflussmesser';
+        try { localStorage.setItem(STORE + '-sensor', name); } catch (e) {}   // zuletzt gewählter Sensor
+        setFlowBtn(name + ' verbunden ✓'); showMsg(''); render();
+      });
+  }
+  // zuletzt verwendeten Sensor (z. B. «SpreadLink-4057») ohne Auswahlliste wieder verbinden, falls der Browser das kann
+  function knownSensor() {
+    var last = null; try { last = localStorage.getItem(STORE + '-sensor'); } catch (e) {}
+    if (!last || !navigator.bluetooth.getDevices) return Promise.resolve(null);
+    return navigator.bluetooth.getDevices().then(function (list) { return list.filter(function (d) { return d.name === last; })[0] || null; }).catch(function () { return null; });
+  }
+  function showSensorHint() {
+    var last = null; try { last = localStorage.getItem(STORE + '-sensor'); } catch (e) {}
+    if (last && !flow.connected) setFlowBtn('Verbinden · zuletzt ' + last);
   }
   $('flowBtn').addEventListener('click', function () {
     if (flow.connected && flow.device) { flow.connected = false; flow.device.gatt.disconnect(); return; }
     if (!navigator.bluetooth) { showMsg('Bluetooth wird in diesem Browser nicht unterstützt. Bitte Chrome auf Android verwenden.'); return; }
-    navigator.bluetooth.requestDevice({ filters: [{ services: [FLOW_SVC] }] })
-      .then(function (dev) {
-        flow.device = dev;
-        dev.addEventListener('gattserverdisconnected', function () {
-          var wanted = flow.connected;
-          flow.connected = false; render();
-          if (!wanted) { setFlowBtn('Durchflussmesser verbinden'); return; }
-          setFlowBtn('Verbindung verloren – verbinde neu …');
-          setTimeout(function retry() { if (!flow.device) return; connectFlow().catch(function () { setTimeout(retry, 3000); }); }, 1000);
-        });
-        return connectFlow();
-      })
+    knownSensor().then(function (known) {
+      // bekannter Sensor: direkt verbinden; sonst Auswahlliste (zeigt alle SpreadLink-Module mit Nummer)
+      return known ? connectFlowDevice(known).catch(function () { return chooseSensor(); }) : chooseSensor();
+    });
+  });
+  function chooseSensor() {
+    return navigator.bluetooth.requestDevice({ filters: [{ services: [FLOW_SVC] }] }).then(connectFlowDevice)
       .catch(function (e) {
-        setFlowBtn('Durchflussmesser verbinden');
+        setFlowBtn('Durchflussmesser verbinden'); showSensorHint();
         if (e && e.name !== 'NotFoundError') showMsg('Durchflussmesser nicht verbunden: ' + (e.message || e));
       });
-  });
+  }
+  // Fehler werden weitergegeben, damit beim bekannten Sensor notfalls die Auswahlliste kommt
+  function connectFlowDevice(dev) {
+    flow.device = dev;
+    if (!dev._spreadLinkHooked) {               // Abbruch-Überwachung nur einmal pro Gerät
+      dev._spreadLinkHooked = true;
+      dev.addEventListener('gattserverdisconnected', function () {
+        var wanted = flow.connected;
+        flow.connected = false; render();
+        if (!wanted) { setFlowBtn('Durchflussmesser verbinden'); showSensorHint(); return; }
+        setFlowBtn('Verbindung verloren – verbinde neu …');
+        setTimeout(function retry() { if (!flow.device) return; connectFlow().catch(function () { setTimeout(retry, 3000); }); }, 1000);
+      });
+    }
+    return connectFlow();
+  }
+  showSensorHint();
 
   // ---------- Zustand ----------
   var cfg = { width: 12, offset: 3, rate: 25, speed: 6, source: 'phone', aOffset: 0, aSide: 0, turnPause: true, headingUp: false, blowSpread: 15, flowCorr: 0 };
@@ -915,7 +941,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (showFlow) {
       $('sFlow').innerHTML = flowHtml;
       var fi = $('flowInfo');
-      if (fi) fi.textContent = flowLive() ? 'Jetzt: ' + fmtM3h(flowActive() ? flowAvg() : flow.lmin) + ' m³/h' + (flow.spread !== null && !isNaN(flow.spread) ? ' · Schwankung ±' + Math.round(flow.spread) + ' m³/h' : ' · Schwankung: Modul-Software zu alt') + (flow.blowing ? ' · Ausblasen erkannt' : flowActive() ? '' : ' · kein Durchfluss') : 'Kein Messwert.';
+      if (fi) fi.textContent = flowLive() ? (flow.device && flow.device.name ? flow.device.name + ' · ' : '') + 'Jetzt: ' + fmtM3h(flowActive() ? flowAvg() : flow.lmin) + ' m³/h' + (flow.spread !== null && !isNaN(flow.spread) ? ' · Schwankung ±' + Math.round(flow.spread) + ' m³/h' : ' · Schwankung: Modul-Software zu alt') + (flow.blowing ? ' · Ausblasen erkannt' : flowActive() ? '' : ' · kein Durchfluss') : 'Kein Messwert.';
       var ar = actualRate();
       $('sRate').innerHTML = (ar === null ? '–' : ar.toFixed(0)) + '<small>m³/ha</small>';
       $('sMeasured').innerHTML = (st.measured !== null && st.measured !== undefined ? st.measured.toFixed(1) : '0.0') + '<small>m³</small>';

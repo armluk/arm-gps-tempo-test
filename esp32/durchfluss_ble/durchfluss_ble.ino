@@ -22,7 +22,8 @@ const uint32_t ENTPRELL_US      = 2000;  // Impulse kürzer als 2 ms Abstand ign
 const uint32_t FENSTER_MS       = 3000;  // Durchfluss = Mittelwert über die letzten 3 Sekunden
 const uint32_t SLOT_MS          = 250;
 
-#define GERAETENAME  "Guelle-Durchfluss"
+// Bluetooth-Name «SpreadLink-1234»: Nummer aus der einmaligen MAC-Adresse des Chips
+#define NAMENSTEIL   "SpreadLink-"
 #define SERVICE_UUID "6b1f0001-4a3b-4d52-9a2e-3c1d5e7f8a90"
 #define WERT_UUID    "6b1f0002-4a3b-4d52-9a2e-3c1d5e7f8a90"
 
@@ -86,7 +87,12 @@ void setup() {
   pinMode(IMPULS_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(IMPULS_PIN), beiImpuls, FALLING);
 
-  BLEDevice::init(GERAETENAME);
+  char geraetename[24];
+  uint64_t mac = ESP.getEfuseMac();
+  snprintf(geraetename, sizeof(geraetename), NAMENSTEIL "%04u", (unsigned)((uint32_t)(mac ^ (mac >> 32)) % 10000));
+  BLEDevice::init(geraetename);
+  Serial.print("Name: ");
+  Serial.println(geraetename);
   BLEServer *server = BLEDevice::createServer();
   server->setCallbacks(new Verbindung());
   BLEService *dienst = server->createService(SERVICE_UUID);
