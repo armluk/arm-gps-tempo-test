@@ -625,7 +625,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   var speedBox = new SpeedCtl().addTo(map).getContainer();
   // Soll: aus dem Durchfluss (Tempo, bei dem die Ist-Menge der Ausbringmenge entspricht), sonst Einstellung
   function sollSpeed() {
-    if (flowActive() && cfg.rate > 0 && cfg.width > 0) return { v: flow.lmin * 0.6 / (cfg.rate * cfg.width), flow: true };
+    if (flowActive() && cfg.rate > 0 && cfg.width > 0) return { v: flowAvg() * 0.6 / (cfg.rate * cfg.width), flow: true };
     return { v: cfg.speed, flow: false };
   }
   function speedState(v, soll) {
@@ -713,6 +713,15 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   function flowLive() { return flow.connected && flow.lmin !== null && Date.now() - flow.t < FLOW_STALE_MS; }
   // echter Gülle-Durchfluss: Messwert aktuell, mindestens 5 m³/h und kein Ausblasen
   function flowActive() { return flowLive() && flow.lmin >= MIN_FLOW && !flow.blowing; }
+  // ruhigere Anzeige: gleitender Durchschnitt über 5 s (nur über Werte mit echtem Durchfluss)
+  var FLOW_AVG_MS = 5000;
+  function flowAvg() {
+    var now = Date.now(), h = (flow.hist || []).filter(function (x) { return now - x.t <= FLOW_AVG_MS; });
+    if (!h.length) return flow.lmin;
+    return h.reduce(function (s, x) { return s + x.v; }, 0) / h.length;
+  }
+  // m³/h: unter 100 mit einer Kommastelle (99.9), ab 100 ganze Zahl
+  function fmtM3h(lmin) { var v = lmin * 0.06; return v < 99.95 ? v.toFixed(1) : String(Math.round(v)); }
   // Ausblasen (Luft reinigt die Leitungen): Durchfluss schwankt in Sekundenbruchteilen stark.
   // Beginnt nach 2 unruhigen Sekunden, endet nach 3 ruhigen – damit es nicht hin und her springt.
   function updateBlowing(spread) {
@@ -723,7 +732,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   function actualRate() {
     var v = speedAvg();
     if (!flowActive() || v === null || v <= STAND || cfg.width <= 0) return null;
-    return flow.lmin * 0.6 / (v * cfg.width);   // m³/ha = l/min × 0.6 ÷ (km/h × m)
+    return flowAvg() * 0.6 / (v * cfg.width);   // m³/ha = l/min × 0.6 ÷ (km/h × m), Durchfluss über 5 s gemittelt
   }
   function rateColor() {
     var ar = actualRate();
@@ -745,6 +754,9 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     lmin *= corr;
     flow.lmin = Math.max(0, lmin); flow.total = total; flow.t = Date.now(); flow.spread = spread;
     updateBlowing(spread);
+    // Verlauf für den 5-s-Durchschnitt; bei «kein Durchfluss» oder Ausblasen neu beginnen
+    if (flowActive()) { flow.hist = (flow.hist || []).concat({ t: flow.t, v: flow.lmin }).filter(function (x) { return flow.t - x.t <= FLOW_AVG_MS; }); }
+    else flow.hist = [];
     // Liter als Zunahmen aufsummieren: startet das Modul neu (Traktor abgestellt), beginnt sein Zähler
     // wieder bei 0 – dann zählt der neue Stand ab 0, statt die Menge zu verfälschen.
     // Unter 5 m³/h und beim Ausblasen (Luft) werden keine Liter gezählt.
@@ -885,7 +897,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     // mit Durchflussmesser: erstes Feld zeigt den Durchfluss – das Tempo steht auf der Karte (Feld unten rechts)
     var flowFirst = flow.connected;
     var flowHtml = flowLive() && flow.blowing ? 'Luft<small>Ausblasen</small>'
-      : (flowActive() ? Math.round(flow.lmin * 0.06) : '–') + '<small>m³/h</small>';   // l/min × 0.06 = m³/h; unter 5 m³/h «–»
+      : (flowActive() ? fmtM3h(flowAvg()) : '–') + '<small>m³/h</small>';   // Durchschnitt 5 s; unter 5 m³/h «–»
     $('sSpeed').innerHTML = flowFirst ? flowHtml : (v === null ? '–' : v <= STAND ? '–' : v.toFixed(1)) + '<small>km/h</small>';
     $('sSpeedLbl').textContent = flowFirst ? 'Durchfluss' : 'Tempo';
     $('sFlowTile').hidden = flowFirst;
@@ -903,7 +915,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (showFlow) {
       $('sFlow').innerHTML = flowHtml;
       var fi = $('flowInfo');
-      if (fi) fi.textContent = flowLive() ? 'Jetzt: ' + Math.round(flow.lmin * 0.06) + ' m³/h' + (flow.spread !== null && !isNaN(flow.spread) ? ' · Schwankung ±' + Math.round(flow.spread) + ' m³/h' : ' · Schwankung: Modul-Software zu alt') + (flow.blowing ? ' · Ausblasen erkannt' : flowActive() ? '' : ' · kein Durchfluss') : 'Kein Messwert.';
+      if (fi) fi.textContent = flowLive() ? 'Jetzt: ' + fmtM3h(flowActive() ? flowAvg() : flow.lmin) + ' m³/h' + (flow.spread !== null && !isNaN(flow.spread) ? ' · Schwankung ±' + Math.round(flow.spread) + ' m³/h' : ' · Schwankung: Modul-Software zu alt') + (flow.blowing ? ' · Ausblasen erkannt' : flowActive() ? '' : ' · kein Durchfluss') : 'Kein Messwert.';
       var ar = actualRate();
       $('sRate').innerHTML = (ar === null ? '–' : ar.toFixed(0)) + '<small>m³/ha</small>';
       $('sMeasured').innerHTML = (st.measured !== null && st.measured !== undefined ? st.measured.toFixed(1) : '0.0') + '<small>m³</small>';
