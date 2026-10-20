@@ -705,7 +705,76 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   setInterval(function () { if (lastLL) render(); }, 1000);   // Ring-Verzögerung und GPS-Ausfall auch ohne neue Position
 
   // ---------- Durchflussmesser (Bluetooth LE, ESP32) ----------
-  var FLOW_SVC = '6b1f0001-4a3b-4d52-9a2e-3c1d5e7f8a90', FLOW_CHR = '6b1f0002-4a3b-4d52-9a2e-3c1d5e7f8a90';
+  var FLOW_SVC = '6b1f0001-4a3b-4d52-9a2e-3c1d5e7f8a90', FLOW_CHR = '6b1f0002-4a3b-4d52-9a2e-3c1d5e7f8a90',
+      FLOW_AUTH = '6b1f0003-4a3b-4d52-9a2e-3c1d5e7f8a90';
+  // Verschlüsselung wie in der Firmware (durchfluss_ble_nrf52.ino): Anmeldung mit Zufallszahlen,
+  // dann AES-128-verschlüsselte Meldungen mit Prüfzeichen. Nur Module mit unserem Schlüssel werden angenommen.
+  var SL = (function () {
+    var a = [17, 160, 231, 193, 81, 48, 215, 116, 102, 119, 169, 70, 152, 130, 49, 106],
+        b = [16, 178, 247, 188, 145, 51, 54, 16, 167, 168, 167, 33, 87, 241, 148, 183];
+    var raw = new Uint8Array(16); for (var i = 0; i < 16; i++) raw[i] = a[i] ^ b[i];
+    function imp(k) { return crypto.subtle.importKey('raw', k, { name: 'AES-CBC' }, false, ['encrypt']); }
+    // ein AES-Block: AES-CBC mit Null-Startwert, der erste Ausgabeblock ist genau AES(k, Block)
+    function aes(key, blk) {
+      return crypto.subtle.encrypt({ name: 'AES-CBC', iv: new Uint8Array(16) }, key, blk)
+        .then(function (r) { return new Uint8Array(r).slice(0, 16); });
+    }
+    function sub(art) { var b = new Uint8Array(16); b[0] = art.charCodeAt(0); return imp(raw).then(function (k) { return aes(k, b); }).then(imp); }
+    var keys = null;
+    function master() { return keys || (keys = Promise.all([sub('A'), sub('E'), sub('M')])); }
+    // Sitzung aus Ns (Modul) und Na (App): liefert Nachweis und Sitzungsschlüssel
+    function session(ns, na) {
+      var s = new Uint8Array(16); s.set(ns, 0); s.set(na, 8);
+      return master().then(function (k) {
+        return Promise.all([aes(k[0], s), aes(k[1], s).then(imp), aes(k[2], s).then(imp)]);
+      }).then(function (r) { return { proof: r[0].slice(0, 8), e: r[1], m: r[2], nr: 0 }; });
+    }
+    // Meldung (20 Bytes) prüfen und entschlüsseln -> [l/min, Liter gesamt, Schwankung] oder null
+    function open(sess, p) {
+      if (p.length !== 20) return Promise.resolve(null);
+      var nr = new DataView(p.buffer, p.byteOffset, 4).getUint32(0, true);
+      if (nr <= sess.nr) return Promise.resolve(null);              // alte oder wiederholte Meldung
+      var m = new Uint8Array(16); m.set(p.subarray(0, 12));
+      var c = new Uint8Array(16); c.set(p.subarray(0, 4));
+      return Promise.all([aes(sess.m, m), aes(sess.e, c)]).then(function (r) {
+        var diff = 0; for (var i = 0; i < 8; i++) diff |= r[0][i] ^ p[12 + i];
+        if (diff || nr <= sess.nr) return null;
+        sess.nr = nr;
+        var w = new Uint8Array(8); for (i = 0; i < 8; i++) w[i] = p[4 + i] ^ r[1][i];
+        var dv = new DataView(w.buffer);
+        return [dv.getUint16(0, true), dv.getUint32(2, true), dv.getUint16(6, true)];
+      });
+    }
+    return { session: session, open: open };
+  })();
+  function delay(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function bytes(dv) { return new Uint8Array(dv.buffer.slice(dv.byteOffset, dv.byteOffset + dv.byteLength)); }
+  // Anmeldung beim Modul: Ns lesen (kurz warten, falls noch nicht bereit), Na + Nachweis schreiben
+  function slLogin(auth) {
+    function readNs(tries) {
+      return auth.readValue().then(function (v) {
+        var ns = bytes(v).slice(0, 8);
+        if (ns.length === 8 && ns.some(function (x) { return x; })) return ns;
+        if (tries <= 0) throw new Error('Sensor antwortet nicht');
+        return delay(300).then(function () { return readNs(tries - 1); });
+      });
+    }
+    return readNs(10).then(function (ns) {
+      var na = crypto.getRandomValues(new Uint8Array(8));
+      return SL.session(ns, na).then(function (sess) {
+        var msg = new Uint8Array(16); msg.set(na, 0); msg.set(sess.proof, 8);
+        var w = auth.writeValueWithResponse ? auth.writeValueWithResponse(msg) : auth.writeValue(msg);
+        return w.then(function () { return sess; });
+      });
+    });
+  }
+  function onFlowPacket(e) {
+    var sess = flow.sess; if (!sess) return;
+    SL.open(sess, bytes(e.target.value)).then(function (v) {
+      if (!v || flow.sess !== sess) return;
+      onFlowValue(v[0] + ';' + v[1] + ';' + v[2]);
+    });
+  }
   // unter 5 m³/h gilt als kein Durchfluss (5 m³/h = 83.3 l/min)
   var MIN_FLOW = 5000 / 60, FLOW_STALE_MS = 5000;
   function newFlow(extra) { return Object.assign({ device: null, connected: false, lmin: null, total: null, t: 0, spread: null, blowing: false, hi: 0, lo: 0 }, extra || {}); }
@@ -770,18 +839,33 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   function connectFlow() {
     if (!flow.device) return Promise.reject(new Error('kein Gerät'));
     setFlowBtn('Verbinde …');
+    flow.sess = null;
     return flow.device.gatt.connect()
       .then(function (server) { return server.getPrimaryService(FLOW_SVC); })
-      .then(function (svc) { return svc.getCharacteristic(FLOW_CHR); })
-      .then(function (chr) {
-        chr.addEventListener('characteristicvaluechanged', function (e) { onFlowValue(new TextDecoder().decode(e.target.value)); });
-        return chr.startNotifications();
+      .then(function (svc) {
+        return Promise.all([svc.getCharacteristic(FLOW_CHR), svc.getCharacteristic(FLOW_AUTH).catch(function () {
+          throw new Error('Sensor hat alte Software ohne Verschlüsselung – bitte neu aufspielen');
+        })]);
+      })
+      .then(function (c) {
+        return slLogin(c[1]).then(function (sess) {
+          flow.sess = sess;
+          if (!c[0]._spreadLinkHooked) { c[0]._spreadLinkHooked = true; c[0].addEventListener('characteristicvaluechanged', onFlowPacket); }
+          return c[0].startNotifications();
+        });
       })
       .then(function () {
         flow.connected = true; if (rec) rec.spreadOff = false;
         var name = flow.device.name || 'Durchflussmesser';
         try { localStorage.setItem(STORE + '-sensor', name); } catch (e) {}   // zuletzt gewählter Sensor
         setFlowBtn(name + ' verbunden ✓'); showMsg(''); render();
+      })
+      .catch(function (e) {
+        // Anmeldung gescheitert oder fremde/alte Software: Verbindung nicht offen lassen
+        flow.sess = null;
+        if (/alte Software/.test(e && e.message)) showMsg(e.message);
+        try { if (flow.device.gatt.connected) flow.device.gatt.disconnect(); } catch (x) {}
+        throw e;
       });
   }
   // zuletzt verwendeten Sensor (z. B. «SpreadLink-4057») ohne Auswahlliste wieder verbinden, falls der Browser das kann

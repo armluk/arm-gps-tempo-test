@@ -2,19 +2,31 @@
 //
 // Zählt die Impulse des KROHNE OPTIFLUX 1000 (Impulsausgang 8–30 V DC, 1 Impuls = 1 Liter)
 // und sendet jede Sekunde den Durchfluss per Bluetooth Low Energy an die Karten-Seite.
-// Gleiches Funkprotokoll wie die ESP32-Version: die Karten-App muss nicht angepasst werden.
+// Funkprotokoll verschlüsselt (siehe unten) – die ESP32-Version sendet noch Klartext und wird von der App
+// nicht mehr angenommen.
 //
 // Hardware: Seeed XIAO nRF52840 (Distrelec 303-83-819) auf der Trägerplatine (PLATINE.md),
 //           Impuls über Optokoppler an D10.
 // Software: Arduino IDE, Boardverwalter-URL von Seeed eintragen und «Seeed nRF52 Boards» installieren,
 //           Board «Seeed XIAO nRF52840» wählen (nicht die «mbed»-Variante – nur diese enthält «bluefruit.h»).
 //
-// Gesendeter Wert (Text): "<Liter pro Minute>;<Liter gesamt seit Einschalten>;<Schwankung ± m³/h>", z. B. "2950;18420;3"
+// Gesendete Werte: Liter pro Minute, Liter gesamt seit Einschalten, Schwankung ± m³/h.
 // Die Schwankung kommt aus den Abständen der einzelnen Impulse in der letzten Sekunde. Schwankt der
 // Durchfluss in Sekundenbruchteilen stark (z. B. ±20 m³/h), wird Luft zum Reinigen eingeblasen
 // («Ausblasen») – die App wertet das dann nicht als Durchfluss.
+//
+// Verschlüsselung (nur unsere App kann mitlesen), AES-128 mit dem festen Schlüssel aus schluessel.h:
+//  1. Beim Verbinden legt das Modul 8 Zufallsbytes Ns in die Anmelde-Kennung (…0003, lesbar).
+//  2. Die App liest Ns, wählt eigene 8 Zufallsbytes Na und schreibt Na + Nachweis (8 Bytes)
+//     = AES(KA, Ns|Na). Falscher Nachweis oder keine Anmeldung innert 5 s: Modul trennt die Verbindung.
+//  3. Sitzungsschlüssel KSe = AES(KE, Ns|Na), KSm = AES(KM, Ns|Na); KA/KE/KM = AES(Schlüssel, 'A'/'E'/'M').
+//  4. Jede Sekunde eine Meldung (20 Bytes): Zähler (4) | verschlüsselte Werte (8) | Prüfzeichen (8).
+//     Werte = l/min (u16) | Liter gesamt (u32) | Schwankung (u16), XOR AES(KSe, Zähler|0…).
+//     Prüfzeichen = AES(KSm, Zähler|verschlüsselte Werte|0…). Zahlen jeweils Little Endian.
+// Ohne schluessel.h lässt sich das Programm nicht übersetzen (Datei wird bewusst nicht veröffentlicht).
 
 #include <bluefruit.h>
+#include "schluessel.h"
 
 // ---------- Einstellungen ----------
 const int      IMPULS_PIN       = D10;   // Optokoppler-Ausgang
@@ -36,8 +48,99 @@ uint16_t geraeteNummer() {
 const uint8_t SERVICE_UUID[16] = { 0x90, 0x8a, 0x7f, 0x5e, 0x1d, 0x3c, 0x2e, 0x9a, 0x52, 0x4d, 0x3b, 0x4a, 0x01, 0x00, 0x1f, 0x6b };
 const uint8_t WERT_UUID[16]    = { 0x90, 0x8a, 0x7f, 0x5e, 0x1d, 0x3c, 0x2e, 0x9a, 0x52, 0x4d, 0x3b, 0x4a, 0x02, 0x00, 0x1f, 0x6b };
 
+const uint8_t ANMELDE_UUID[16] = { 0x90, 0x8a, 0x7f, 0x5e, 0x1d, 0x3c, 0x2e, 0x9a, 0x52, 0x4d, 0x3b, 0x4a, 0x03, 0x00, 0x1f, 0x6b };
+
 BLEService        dienst(SERVICE_UUID);
 BLECharacteristic wert(WERT_UUID);
+BLECharacteristic anmeldung(ANMELDE_UUID);
+
+// ---------- Verschlüsselung ----------
+// AES-128 macht die Funkeinheit des nRF52840 (über das SoftDevice) – kein Zusatzprogramm nötig
+void aes(const uint8_t key[16], const uint8_t ein[16], uint8_t aus[16]) {
+  nrf_ecb_hal_data_t d;
+  memcpy(d.key, key, 16); memcpy(d.cleartext, ein, 16);
+  sd_ecb_block_encrypt(&d);
+  memcpy(aus, d.ciphertext, 16);
+}
+void zufall(uint8_t* p, uint8_t n) {
+  while (sd_rand_application_vector_get(p, n) != NRF_SUCCESS) yield();
+}
+void le32(uint8_t* p, uint32_t v) { p[0] = v; p[1] = v >> 8; p[2] = v >> 16; p[3] = v >> 24; }
+void le16(uint8_t* p, uint16_t v) { p[0] = v; p[1] = v >> 8; }
+
+uint8_t kA[16], kE[16], kM[16];          // aus dem Schlüssel abgeleitet
+uint8_t kSe[16], kSm[16];                // Sitzungsschlüssel der aktuellen Verbindung
+uint8_t ns[8];                           // Zufallszahl des Moduls für diese Verbindung
+volatile bool angemeldet = false;
+volatile uint16_t verbindung = BLE_CONN_HANDLE_INVALID;
+volatile uint32_t verbundenSeit = 0;
+uint32_t meldungNr = 0;
+
+void ableiten(char art, uint8_t aus[16]) {
+  uint8_t b[16] = { 0 }; b[0] = art;
+  aes(SCHLUESSEL, b, aus);
+}
+
+void beiVerbindung(uint16_t h) {
+  angemeldet = false;
+  zufall(ns, 8);
+  anmeldung.write(ns, 8);
+  verbundenSeit = millis();
+  verbindung = h;
+}
+void beiTrennung(uint16_t h, uint8_t grund) {
+  angemeldet = false;
+  verbindung = BLE_CONN_HANDLE_INVALID;
+  uint8_t null[8] = { 0 };
+  anmeldung.write(null, 8);
+}
+void beiAnmeldung(uint16_t h, BLECharacteristic* c, uint8_t* d, uint16_t n) {
+  if (angemeldet) return;
+  uint8_t s[16], p[16], diff = 0;
+  memcpy(s, ns, 8);
+  if (n == 16) {
+    memcpy(s + 8, d, 8);
+    aes(kA, s, p);
+    for (int i = 0; i < 8; i++) diff |= p[i] ^ d[8 + i];   // ohne frühen Abbruch vergleichen
+  }
+  if (n != 16 || diff) { Serial.println("Anmeldung abgelehnt"); Bluefruit.disconnect(h); return; }
+  aes(kE, s, kSe); aes(kM, s, kSm);
+  meldungNr = 0;
+  angemeldet = true;
+  Serial.println("App angemeldet");
+}
+
+// eine verschlüsselte Meldung (20 Bytes) bilden
+void verpacken(uint16_t lmin, uint32_t total, uint16_t spread, uint8_t pk[20]) {
+  uint8_t w[8], b[16] = { 0 }, x[16];
+  le16(w, lmin); le32(w + 2, total); le16(w + 6, spread);
+  le32(b, ++meldungNr);
+  aes(kSe, b, x);
+  memcpy(pk, b, 4);
+  for (int i = 0; i < 8; i++) pk[4 + i] = w[i] ^ x[i];
+  memset(b, 0, 16); memcpy(b, pk, 12);
+  aes(kSm, b, x);
+  memcpy(pk + 12, x, 8);
+}
+
+void druckeHex(const char* name, const uint8_t* p, int n) {
+  Serial.print(name);
+  for (int i = 0; i < n; i++) { if (p[i] < 16) Serial.print('0'); Serial.print(p[i], HEX); }
+  Serial.println();
+}
+// Selbsttest beim Start: AES nach FIPS-197 und eine Testmeldung (mit der App vergleichbar)
+void selbsttest() {
+  uint8_t k[16], t[16], c[16];
+  for (int i = 0; i < 16; i++) { k[i] = i; t[i] = i * 0x11; }
+  aes(k, t, c);
+  druckeHex("AES-Test (soll 69C4E0D86A7B0430D8CDB78070B4C55A): ", c, 16);
+  uint8_t s[16], pk[20];
+  for (int i = 0; i < 16; i++) s[i] = i + 1;   // Ns = 01..08, Na = 09..10
+  aes(kA, s, c); druckeHex("Test-Nachweis: ", c, 8);
+  aes(kE, s, kSe); aes(kM, s, kSm); meldungNr = 0;
+  verpacken(2950, 18420, 3, pk); druckeHex("Test-Meldung: ", pk, 20);
+  meldungNr = 0;
+}
 
 // ---------- Impulse zählen ----------
 volatile uint32_t impulse = 0;
@@ -102,13 +205,25 @@ void setup() {
   Bluefruit.setName(geraetename);
   Bluefruit.setTxPower(4);  // maximale Sendeleistung für Reichweite bis in die Kabine
 
-  dienst.begin();
-  wert.setProperties(CHR_PROPS_READ | CHR_PROPS_NOTIFY);
-  wert.setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);
-  wert.setMaxLen(32);
-  wert.begin();
-  wert.write("0;0");
+  ableiten('A', kA); ableiten('E', kE); ableiten('M', kM);
+  Bluefruit.Periph.setConnectCallback(beiVerbindung);
+  Bluefruit.Periph.setDisconnectCallback(beiTrennung);
 
+  dienst.begin();
+  wert.setProperties(CHR_PROPS_NOTIFY);              // nur verschlüsselte Meldungen, kein Klartext zum Auslesen
+  wert.setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS);
+  wert.setFixedLen(20);
+  wert.begin();
+  anmeldung.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE);
+  anmeldung.setPermission(SECMODE_OPEN, SECMODE_OPEN);
+  anmeldung.setMaxLen(16);
+  anmeldung.setWriteCallback(beiAnmeldung);
+  anmeldung.begin();
+  uint8_t null[8] = { 0 };
+  anmeldung.write(null, 8);
+
+  delay(1500);                                       // Zeit, um den seriellen Monitor zu öffnen
+  selbsttest();
   startWerbung();
 
   zaehler[0] = 0;
@@ -139,11 +254,24 @@ void loop() {
     uint32_t dt = ms - zeit[alt];
     float lmin = dt > 0 ? (n - zaehler[alt]) * LITER_PRO_IMPULS * 60000.0f / dt : 0;
 
+    uint32_t q = (uint32_t)(lmin + 0.5f), total = (uint32_t)(n * LITER_PRO_IMPULS), sp = (uint32_t)(schwankung() + 0.5f);
+    if (q > 65535) q = 65535;
+    if (sp > 65535) sp = 65535;
+    if (angemeldet && Bluefruit.connected()) {
+      uint8_t pk[20];
+      verpacken(q, total, sp, pk);
+      wert.notify(pk, 20);
+    }
     char text[32];
-    snprintf(text, sizeof(text), "%lu;%lu;%lu", (unsigned long)(lmin + 0.5f), (unsigned long)(n * LITER_PRO_IMPULS),
-             (unsigned long)(schwankung() + 0.5f));
-    wert.write(text);
-    if (Bluefruit.connected()) wert.notify(text);
-    Serial.println(text);
+    snprintf(text, sizeof(text), "%lu;%lu;%lu", (unsigned long)q, (unsigned long)total, (unsigned long)sp);
+    Serial.println(text);                     // Klartext nur über USB
+  }
+
+  // fremde Geräte, die sich nicht anmelden, belegen die Verbindung nicht – nach 5 s trennen
+  uint16_t h = verbindung;
+  if (h != BLE_CONN_HANDLE_INVALID && !angemeldet && millis() - verbundenSeit > 5000) {
+    Serial.println("keine Anmeldung - getrennt");
+    verbundenSeit = millis();
+    Bluefruit.disconnect(h);
   }
 }

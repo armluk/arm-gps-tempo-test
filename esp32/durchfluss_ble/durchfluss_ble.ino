@@ -1,5 +1,8 @@
 // Durchfluss-Sender Güllefass – Arm Eggiwil AG
 //
+// VERALTET: sendet unverschlüsselt und wird von der App nicht mehr angenommen – aktuell ist
+// durchfluss_ble_nrf52 (XIAO nRF52840, verschlüsselt).
+//
 // Zählt die Impulse des KROHNE OPTIFLUX 1000 (Impulsausgang 12 V DC, 1 Impuls = 1 Liter)
 // und sendet jede Sekunde den Durchfluss per Bluetooth Low Energy an die Karten-Seite.
 //
