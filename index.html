@@ -291,6 +291,10 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <div class="ctrl"><button class="step" type="button" data-k="flowCorr" data-d="-1" aria-label="Korrektur um 1 % verringern">−</button><input id="flowCorr" type="range" min="-15" max="15" step="1" value="0"><button class="step" type="button" data-k="flowCorr" data-d="1" aria-label="Korrektur um 1 % erhöhen">+</button></div>
 <p class="note">Gleicht kleine Abweichungen durch die unterschiedliche Dichte der Gülle aus. Wirkt auf Durchfluss, Ist-Menge und gemessene m³. Beispiel: +3 % = Messwert × 1.03.</p>
 </div>
+<div class="set-row">
+<button class="btn line" id="dfuBtn" type="button"><span>Sensor-Update starten</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
+<p class="note">Schaltet den verbundenen Sensor in den Update-Modus. Danach in der App «nRF Device Firmware Update» (Nordic) das Gerät mit «DFU» im Namen wählen und die Update-Datei (.zip) aufspielen. Ohne Übertragung startet der Sensor nach kurzer Zeit wieder normal.</p>
+</div>
 </div>
 </section>
 
@@ -706,7 +710,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 
   // ---------- Durchflussmesser (Bluetooth LE, ESP32) ----------
   var FLOW_SVC = '6b1f0001-4a3b-4d52-9a2e-3c1d5e7f8a90', FLOW_CHR = '6b1f0002-4a3b-4d52-9a2e-3c1d5e7f8a90',
-      FLOW_AUTH = '6b1f0003-4a3b-4d52-9a2e-3c1d5e7f8a90';
+      FLOW_AUTH = '6b1f0003-4a3b-4d52-9a2e-3c1d5e7f8a90', FLOW_CMD = '6b1f0004-4a3b-4d52-9a2e-3c1d5e7f8a90';
   // Verschlüsselung wie in der Firmware (durchfluss_ble_nrf52.ino): Anmeldung mit Zufallszahlen,
   // dann AES-128-verschlüsselte Meldungen mit Prüfzeichen. Nur Module mit unserem Schlüssel werden angenommen.
   var SL = (function () {
@@ -745,7 +749,9 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
         return [dv.getUint16(0, true), dv.getUint32(2, true), dv.getUint16(6, true)];
       });
     }
-    return { session: session, open: open };
+    // Nachweis für den Befehl «Update-Modus» (nur mit den Schlüsseln der eigenen Sitzung gültig)
+    function dfu(sess) { var b = new Uint8Array(16); b.set([68, 70, 85]); return aes(sess.m, b).then(function (x) { return x.slice(0, 8); }); }
+    return { session: session, open: open, dfu: dfu };
   })();
   function delay(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   function bytes(dv) { return new Uint8Array(dv.buffer.slice(dv.byteOffset, dv.byteOffset + dv.byteLength)); }
@@ -845,11 +851,11 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       .then(function (svc) {
         return Promise.all([svc.getCharacteristic(FLOW_CHR), svc.getCharacteristic(FLOW_AUTH).catch(function () {
           throw new Error('Sensor hat alte Software ohne Verschlüsselung – bitte neu aufspielen');
-        })]);
+        }), svc.getCharacteristic(FLOW_CMD).catch(function () { return null; })]);   // Update-Befehl (ab Software mit Bluetooth-Update)
       })
       .then(function (c) {
         return slLogin(c[1]).then(function (sess) {
-          flow.sess = sess;
+          flow.sess = sess; flow.cmd = c[2];
           if (!c[0]._spreadLinkHooked) { c[0]._spreadLinkHooked = true; c[0].addEventListener('characteristicvaluechanged', onFlowPacket); }
           return c[0].startNotifications();
         });
@@ -884,6 +890,20 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     knownSensor().then(function (known) {
       // bekannter Sensor: direkt verbinden; sonst Auswahlliste (zeigt alle SpreadLink-Module mit Nummer)
       return known ? connectFlowDevice(known).catch(function () { return chooseSensor(); }) : chooseSensor();
+    });
+  });
+  // Sensor-Update: angemeldeten Sensor in den Update-Modus schalten (Übertragung dann mit der Nordic-App)
+  $('dfuBtn').addEventListener('click', function () {
+    if (!flow.connected || !flow.sess) { showMsg('Für das Update zuerst den Durchflussmesser verbinden.'); return; }
+    if (!flow.cmd) { showMsg('Dieser Sensor kann noch kein Update per Bluetooth – einmal per USB neu aufspielen.'); return; }
+    if (!confirm('Sensor ' + (flow.device.name || '') + ' in den Update-Modus schalten?\n\nDie Verbindung wird getrennt. Danach in der App «nRF Device Firmware Update» die Update-Datei aufspielen.')) return;
+    var cmd = flow.cmd;
+    SL.dfu(flow.sess).then(function (proof) {
+      flow.connected = false;                    // gewollte Trennung: nicht automatisch neu verbinden
+      return (cmd.writeValueWithResponse ? cmd.writeValueWithResponse(proof) : cmd.writeValue(proof)).catch(function () {});
+    }).then(function () {
+      setFlowBtn('Sensor im Update-Modus'); render();
+      showMsg('Sensor im Update-Modus. Jetzt «nRF Device Firmware Update» öffnen, Gerät mit «DFU» wählen und die .zip-Datei aufspielen. Danach hier wieder «Durchflussmesser verbinden».');
     });
   });
   function chooseSensor() {

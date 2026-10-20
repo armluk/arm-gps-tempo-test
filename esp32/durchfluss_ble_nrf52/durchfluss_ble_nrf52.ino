@@ -24,6 +24,8 @@
 //  4. Jede Sekunde eine Meldung (20 Bytes): Zähler (4) | verschlüsselte Werte (8) | Prüfzeichen (8).
 //     Werte = l/min (u16) | Liter gesamt (u32) | Schwankung (u16), XOR AES(KSe, Zähler|0…).
 //     Prüfzeichen = AES(KSm, Zähler|verschlüsselte Werte|0…). Zahlen jeweils Little Endian.
+//  5. Update per Bluetooth: angemeldetes Handy schreibt AES(KSm, 'D','F','U',0…) (8 Bytes) in …0004,
+//     das Modul startet in den Update-Modus («nRF Device Firmware Update», Datei .zip vom Übersetzen).
 // Ohne schluessel.h lässt sich das Programm nicht übersetzen (Datei wird bewusst nicht veröffentlicht).
 
 #include <bluefruit.h>
@@ -55,6 +57,10 @@ const uint8_t ANMELDE_UUID[16] = { 0x90, 0x8a, 0x7f, 0x5e, 0x1d, 0x3c, 0x2e, 0x9
 BLEService        dienst(SERVICE_UUID);
 BLECharacteristic wert(WERT_UUID);
 BLECharacteristic anmeldung(ANMELDE_UUID);
+// Befehl «Update-Modus»: nur von einem angemeldeten Handy, Nachweis = AES(KSm, 'D','F','U',0…) der eigenen Sitzung
+const uint8_t BEFEHL_UUID[16] = { 0x90, 0x8a, 0x7f, 0x5e, 0x1d, 0x3c, 0x2e, 0x9a, 0x52, 0x4d, 0x3b, 0x4a, 0x04, 0x00, 0x1f, 0x6b };
+BLECharacteristic befehl(BEFEHL_UUID);
+volatile bool updateAngefordert = false;
 
 // ---------- Verschlüsselung ----------
 // Bis zu 3 Handys gleichzeitig, jedes mit eigener Anmeldung und eigenen Sitzungsschlüsseln.
@@ -128,6 +134,17 @@ void beiAnmeldung(uint16_t h, BLECharacteristic* c, uint8_t* d, uint16_t n) {
   s->nr = 0;
   s->angemeldet = true;
   Serial.println("App angemeldet");
+}
+
+// Update per Bluetooth: angemeldetes Handy schaltet in den Update-Modus des Startladers.
+// Danach mit der App «nRF Device Firmware Update» die .zip-Datei aus dem Übersetzen aufspielen.
+void beiBefehl(uint16_t h, BLECharacteristic* c, uint8_t* d, uint16_t n) {
+  Sitzung* s = finde(h);
+  if (!s || !s->angemeldet || n != 8) return;
+  uint8_t b[16] = { 'D', 'F', 'U' }, x[16], diff = 0;
+  aes(s->kSm, b, x);
+  for (int i = 0; i < 8; i++) diff |= x[i] ^ d[i];
+  if (!diff) updateAngefordert = true;
 }
 
 // eine verschlüsselte Meldung (20 Bytes) für eine Sitzung bilden
@@ -241,6 +258,11 @@ void setup() {
   anmeldung.setWriteCallback(beiAnmeldung);
   anmeldung.setReadAuthorizeCallback(beiAnmeldeLesen, false);   // Ns pro Handy, direkt im Bluetooth-Ablauf
   anmeldung.begin();
+  befehl.setProperties(CHR_PROPS_WRITE);
+  befehl.setPermission(SECMODE_NO_ACCESS, SECMODE_OPEN);
+  befehl.setMaxLen(8);
+  befehl.setWriteCallback(beiBefehl);
+  befehl.begin();
 
   delay(1500);                                       // Zeit, um den seriellen Monitor zu öffnen
   selbsttest();
@@ -258,6 +280,12 @@ uint32_t naechsteMeldung = 0;
 
 void loop() {
   uint32_t ms = millis();
+
+  if (updateAngefordert) {
+    Serial.println("Update-Modus (Bluetooth) - Neustart in den Startlader");
+    delay(500);                               // Antwort an das Handy noch senden lassen
+    enterOTADfu();
+  }
 
   if ((int32_t)(ms - naechsterSlot) >= 0) {
     naechsterSlot = ms + SLOT_MS;
