@@ -16,7 +16,8 @@
 // («Ausblasen») – die App wertet das dann nicht als Durchfluss.
 //
 // Verschlüsselung (nur unsere App kann mitlesen), AES-128 mit dem festen Schlüssel aus schluessel.h:
-//  1. Beim Verbinden legt das Modul 8 Zufallsbytes Ns in die Anmelde-Kennung (…0003, lesbar).
+//  0. Bis zu 3 Handys gleichzeitig, jedes mit eigener Sitzung. Nichts wird dauerhaft gespeichert.
+//  1. Beim Verbinden erzeugt das Modul 8 Zufallsbytes Ns für dieses Handy (Anmelde-Kennung …0003 lesen).
 //  2. Die App liest Ns, wählt eigene 8 Zufallsbytes Na und schreibt Na + Nachweis (8 Bytes)
 //     = AES(KA, Ns|Na). Falscher Nachweis oder keine Anmeldung innert 5 s: Modul trennt die Verbindung.
 //  3. Sitzungsschlüssel KSe = AES(KE, Ns|Na), KSm = AES(KM, Ns|Na); KA/KE/KM = AES(Schlüssel, 'A'/'E'/'M').
@@ -27,6 +28,7 @@
 
 #include <bluefruit.h>
 #include "schluessel.h"
+#include "sitzung.h"
 
 // ---------- Einstellungen ----------
 const int      IMPULS_PIN       = D10;   // Optokoppler-Ausgang
@@ -55,6 +57,10 @@ BLECharacteristic wert(WERT_UUID);
 BLECharacteristic anmeldung(ANMELDE_UUID);
 
 // ---------- Verschlüsselung ----------
+// Bis zu 3 Handys gleichzeitig, jedes mit eigener Anmeldung und eigenen Sitzungsschlüsseln.
+// Alles nur im Arbeitsspeicher (keine Kopplung, nichts im Flash): aus- und einstecken = alles vergessen.
+// (struct Sitzung steht in sitzung.h, weil die Arduino-IDE Funktionsdeklarationen vor den Code setzt)
+
 // AES-128 macht die Funkeinheit des nRF52840 (über das SoftDevice) – kein Zusatzprogramm nötig
 void aes(const uint8_t key[16], const uint8_t ein[16], uint8_t aus[16]) {
   nrf_ecb_hal_data_t d;
@@ -69,12 +75,12 @@ void le32(uint8_t* p, uint32_t v) { p[0] = v; p[1] = v >> 8; p[2] = v >> 16; p[3
 void le16(uint8_t* p, uint16_t v) { p[0] = v; p[1] = v >> 8; }
 
 uint8_t kA[16], kE[16], kM[16];          // aus dem Schlüssel abgeleitet
-uint8_t kSe[16], kSm[16];                // Sitzungsschlüssel der aktuellen Verbindung
-uint8_t ns[8];                           // Zufallszahl des Moduls für diese Verbindung
-volatile bool angemeldet = false;
-volatile uint16_t verbindung = BLE_CONN_HANDLE_INVALID;
-volatile uint32_t verbundenSeit = 0;
-uint32_t meldungNr = 0;
+Sitzung sitz[MAX_HANDYS];
+
+Sitzung* finde(uint16_t h) {
+  for (int i = 0; i < MAX_HANDYS; i++) if (sitz[i].h == h) return &sitz[i];
+  return nullptr;
+}
 
 void ableiten(char art, uint8_t aus[16]) {
   uint8_t b[16] = { 0 }; b[0] = art;
@@ -82,44 +88,58 @@ void ableiten(char art, uint8_t aus[16]) {
 }
 
 void beiVerbindung(uint16_t h) {
-  angemeldet = false;
-  zufall(ns, 8);
-  anmeldung.write(ns, 8);
-  verbundenSeit = millis();
-  verbindung = h;
+  Sitzung* s = finde(BLE_CONN_HANDLE_INVALID);
+  if (!s) { Bluefruit.disconnect(h); return; }
+  s->angemeldet = false;
+  zufall(s->ns, 8);
+  s->seit = millis();
+  s->h = h;
+  // weiter sichtbar bleiben, solange noch ein Platz frei ist
+  if (Bluefruit.Periph.connected() < MAX_HANDYS) Bluefruit.Advertising.start(0);
 }
 void beiTrennung(uint16_t h, uint8_t grund) {
-  angemeldet = false;
-  verbindung = BLE_CONN_HANDLE_INVALID;
-  uint8_t null[8] = { 0 };
-  anmeldung.write(null, 8);
+  Sitzung* s = finde(h);
+  if (s) { memset(s, 0, sizeof(Sitzung)); s->h = BLE_CONN_HANDLE_INVALID; }
+}
+// Lesen der Anmelde-Kennung: jedes Handy bekommt seine eigene Zufallszahl Ns
+void beiAnmeldeLesen(uint16_t h, BLECharacteristic* c, ble_gatts_evt_read_t* req) {
+  static uint8_t leer[8] = { 0 };
+  Sitzung* s = finde(h);
+  ble_gatts_rw_authorize_reply_params_t r = { .type = BLE_GATTS_AUTHORIZE_TYPE_READ };
+  r.params.read.gatt_status = BLE_GATT_STATUS_SUCCESS;
+  r.params.read.update = 1;
+  r.params.read.offset = 0;
+  r.params.read.len = 8;
+  r.params.read.p_data = s ? s->ns : leer;
+  sd_ble_gatts_rw_authorize_reply(h, &r);
 }
 void beiAnmeldung(uint16_t h, BLECharacteristic* c, uint8_t* d, uint16_t n) {
-  if (angemeldet) return;
-  uint8_t s[16], p[16], diff = 0;
-  memcpy(s, ns, 8);
+  Sitzung* s = finde(h);
+  if (!s || s->angemeldet) return;
+  uint8_t b[16], p[16], diff = 0;
+  memcpy(b, s->ns, 8);
   if (n == 16) {
-    memcpy(s + 8, d, 8);
-    aes(kA, s, p);
+    memcpy(b + 8, d, 8);
+    aes(kA, b, p);
     for (int i = 0; i < 8; i++) diff |= p[i] ^ d[8 + i];   // ohne frühen Abbruch vergleichen
   }
   if (n != 16 || diff) { Serial.println("Anmeldung abgelehnt"); Bluefruit.disconnect(h); return; }
-  aes(kE, s, kSe); aes(kM, s, kSm);
-  meldungNr = 0;
-  angemeldet = true;
+  aes(kE, b, s->kSe); aes(kM, b, s->kSm);
+  s->nr = 0;
+  s->angemeldet = true;
   Serial.println("App angemeldet");
 }
 
-// eine verschlüsselte Meldung (20 Bytes) bilden
-void verpacken(uint16_t lmin, uint32_t total, uint16_t spread, uint8_t pk[20]) {
+// eine verschlüsselte Meldung (20 Bytes) für eine Sitzung bilden
+void verpacken(Sitzung* s, uint16_t lmin, uint32_t total, uint16_t spread, uint8_t pk[20]) {
   uint8_t w[8], b[16] = { 0 }, x[16];
   le16(w, lmin); le32(w + 2, total); le16(w + 6, spread);
-  le32(b, ++meldungNr);
-  aes(kSe, b, x);
+  le32(b, ++s->nr);
+  aes(s->kSe, b, x);
   memcpy(pk, b, 4);
   for (int i = 0; i < 8; i++) pk[4 + i] = w[i] ^ x[i];
   memset(b, 0, 16); memcpy(b, pk, 12);
-  aes(kSm, b, x);
+  aes(s->kSm, b, x);
   memcpy(pk + 12, x, 8);
 }
 
@@ -135,11 +155,11 @@ void selbsttest() {
   aes(k, t, c);
   druckeHex("AES-Test (soll 69C4E0D86A7B0430D8CDB78070B4C55A): ", c, 16);
   uint8_t s[16], pk[20];
+  Sitzung test = {};
   for (int i = 0; i < 16; i++) s[i] = i + 1;   // Ns = 01..08, Na = 09..10
   aes(kA, s, c); druckeHex("Test-Nachweis: ", c, 8);
-  aes(kE, s, kSe); aes(kM, s, kSm); meldungNr = 0;
-  verpacken(2950, 18420, 3, pk); druckeHex("Test-Meldung: ", pk, 20);
-  meldungNr = 0;
+  aes(kE, s, test.kSe); aes(kM, s, test.kSm);
+  verpacken(&test, 2950, 18420, 3, pk); druckeHex("Test-Meldung: ", pk, 20);
 }
 
 // ---------- Impulse zählen ----------
@@ -200,7 +220,8 @@ void setup() {
   pinMode(IMPULS_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(IMPULS_PIN), beiImpuls, FALLING);
 
-  Bluefruit.begin();
+  for (int i = 0; i < MAX_HANDYS; i++) { memset(&sitz[i], 0, sizeof(Sitzung)); sitz[i].h = BLE_CONN_HANDLE_INVALID; }
+  Bluefruit.begin(MAX_HANDYS, 0);                    // bis zu 3 Handys gleichzeitig
   snprintf(geraetename, sizeof(geraetename), NAMENSTEIL "%04u", geraeteNummer());
   Bluefruit.setName(geraetename);
   Bluefruit.setTxPower(4);  // maximale Sendeleistung für Reichweite bis in die Kabine
@@ -218,9 +239,8 @@ void setup() {
   anmeldung.setPermission(SECMODE_OPEN, SECMODE_OPEN);
   anmeldung.setMaxLen(16);
   anmeldung.setWriteCallback(beiAnmeldung);
+  anmeldung.setReadAuthorizeCallback(beiAnmeldeLesen, false);   // Ns pro Handy, direkt im Bluetooth-Ablauf
   anmeldung.begin();
-  uint8_t null[8] = { 0 };
-  anmeldung.write(null, 8);
 
   delay(1500);                                       // Zeit, um den seriellen Monitor zu öffnen
   selbsttest();
@@ -257,21 +277,26 @@ void loop() {
     uint32_t q = (uint32_t)(lmin + 0.5f), total = (uint32_t)(n * LITER_PRO_IMPULS), sp = (uint32_t)(schwankung() + 0.5f);
     if (q > 65535) q = 65535;
     if (sp > 65535) sp = 65535;
-    if (angemeldet && Bluefruit.connected()) {
+    for (int i = 0; i < MAX_HANDYS; i++) {   // jedem angemeldeten Handy seine eigene verschlüsselte Meldung
+      Sitzung* s = &sitz[i];
+      if (s->h == BLE_CONN_HANDLE_INVALID || !s->angemeldet || !wert.notifyEnabled(s->h)) continue;
       uint8_t pk[20];
-      verpacken(q, total, sp, pk);
-      wert.notify(pk, 20);
+      verpacken(s, q, total, sp, pk);
+      wert.notify(s->h, pk, 20);
     }
     char text[32];
     snprintf(text, sizeof(text), "%lu;%lu;%lu", (unsigned long)q, (unsigned long)total, (unsigned long)sp);
     Serial.println(text);                     // Klartext nur über USB
   }
 
-  // fremde Geräte, die sich nicht anmelden, belegen die Verbindung nicht – nach 5 s trennen
-  uint16_t h = verbindung;
-  if (h != BLE_CONN_HANDLE_INVALID && !angemeldet && millis() - verbundenSeit > 5000) {
-    Serial.println("keine Anmeldung - getrennt");
-    verbundenSeit = millis();
-    Bluefruit.disconnect(h);
+  // fremde Geräte, die sich nicht anmelden, belegen keinen Platz – nach 5 s trennen
+  for (int i = 0; i < MAX_HANDYS; i++) {
+    Sitzung* s = &sitz[i];
+    uint16_t h = s->h;
+    if (h != BLE_CONN_HANDLE_INVALID && !s->angemeldet && millis() - s->seit > 5000) {
+      Serial.println("keine Anmeldung - getrennt");
+      s->seit = millis();
+      Bluefruit.disconnect(h);
+    }
   }
 }
