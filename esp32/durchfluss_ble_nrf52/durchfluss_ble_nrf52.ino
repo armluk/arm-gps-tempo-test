@@ -264,7 +264,9 @@ void setup() {
   befehl.setWriteCallback(beiBefehl);
   befehl.begin();
 
-  delay(1500);                                       // Zeit, um den seriellen Monitor zu öffnen
+  uint32_t t0 = millis();                            // bis 3 s auf den seriellen Monitor warten (ohne USB: weiter)
+  while (!Serial && millis() - t0 < 3000) delay(10);
+  delay(200);
   selbsttest();
   startWerbung();
 
