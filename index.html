@@ -226,7 +226,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <div class="foot"><span id="tParcel">Parzelle –</span><span>Mittelwert über 5 s</span></div>
 </section>
 <button class="btn line" id="gpsOnly" type="button"><span>Nur Tempo messen (ohne Aufzeichnung)</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
-<p class="note">Pfeil hoch: schneller fahren. Pfeil runter: langsamer fahren. Kein Pfeil: im Sollbereich ±0.5 km/h oder beim Wenden. «=» bedeutet Stillstand (0.5 km/h oder weniger). Die Soll-Geschwindigkeit wird im Menü oben rechts eingestellt.</p>
+<p class="note">Pfeil hoch: schneller fahren. Pfeil runter: langsamer fahren. Kein Pfeil: im Sollbereich ±0.5 km/h oder beim Wenden. «=» bedeutet Stillstand (0.5 km/h oder weniger). Die Soll-Geschwindigkeit berechnet die App aus Pumpen-Volumenstrom (oder gemessenem Durchfluss), Ausbringmenge und Arbeitsbreite – einstellen im Menü oben rechts.</p>
 </div>
 
 <section class="panel">
@@ -267,14 +267,14 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <div class="set-head"><label for="rate">Ausbringmenge</label><output id="rateOut">25 m³/ha</output></div>
 <div class="ctrl"><button class="step" type="button" data-k="rate" data-d="-1" aria-label="Ausbringmenge um 1 m³/ha verringern">−</button><input id="rate" type="range" min="0" max="100" step="1" value="25"><button class="step" type="button" data-k="rate" data-d="1" aria-label="Ausbringmenge um 1 m³/ha erhöhen">+</button></div>
 </div>
-<div class="set-row" id="rowSpeedFlow" hidden>
-<div class="set-head"><span class="lbl">Soll-Geschwindigkeit</span><output id="speedFlowOut">–</output></div>
-<p class="note">Berechnet aus Durchfluss, Ausbringmenge und Arbeitsbreite – muss nicht eingestellt werden.</p>
+<div class="set-row" id="rowPump">
+<div class="set-head"><label for="pump">Pumpen-Volumenstrom</label><output id="pumpOut">120 m³/h</output></div>
+<div class="ctrl"><button class="step" type="button" data-k="pump" data-d="-1" aria-label="Pumpen-Volumenstrom um 5 m³/h verringern">−</button><input id="pump" type="range" min="20" max="250" step="5" value="120"><button class="step" type="button" data-k="pump" data-d="1" aria-label="Pumpen-Volumenstrom um 5 m³/h erhöhen">+</button></div>
+<p class="note">Ohne Durchflussmesser: ungefähre Förderleistung der Pumpe. Daraus berechnet die App die Soll-Geschwindigkeit, die Ist-Menge (Einfärbung) und die ausgebrachte Gülle. Mit verbundenem Durchflussmesser gilt der gemessene Wert – dann ist diese Einstellung ausgeblendet.</p>
 </div>
-<div class="set-row" id="rowSpeed">
-<div class="set-head"><label for="speed">Soll-Geschwindigkeit</label><output id="speedOut">6.0 km/h</output></div>
-<div class="ctrl"><button class="step" type="button" data-k="speed" data-d="-1" aria-label="Soll-Geschwindigkeit um 0.5 km/h verringern">−</button><input id="speed" type="range" min="0" max="15" step="0.5" value="6"><button class="step" type="button" data-k="speed" data-d="1" aria-label="Soll-Geschwindigkeit um 0.5 km/h erhöhen">+</button></div>
-<p class="note">Mit verbundenem Durchflussmesser wird die Soll-Geschwindigkeit aus Durchfluss, Ausbringmenge und Arbeitsbreite berechnet. Traktor-Punkt auf der Karte: Ring läuft nach innen = zu schnell, nach aussen = zu langsam, je öfter, desto grösser die Abweichung. Gelb ohne Ring = im Bereich ±0.5 km/h. Grau = Wenden, gelb, gross und leicht pulsierend = Stillstand, hohl = kein GPS.</p>
+<div class="set-row" id="rowSpeedFlow">
+<div class="set-head"><span class="lbl">Soll-Geschwindigkeit</span><output id="speedFlowOut">–</output></div>
+<p class="note"><span id="speedFlowSrc">Berechnet aus Pumpen-Volumenstrom</span>, Ausbringmenge und Arbeitsbreite – muss nicht eingestellt werden. Traktor-Punkt auf der Karte: Ring läuft nach innen = zu schnell, nach aussen = zu langsam, je öfter, desto grösser die Abweichung. Gelb ohne Ring = im Bereich ±0.5 km/h. Grau = Wenden, gelb, gross und leicht pulsierend = Stillstand, hohl = kein GPS.</p>
 </div>
 <div class="set-row">
 <div class="set-head"><span class="lbl" id="turnLbl">Beim Wenden</span></div>
@@ -738,10 +738,13 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     onAdd: function () { var d = L.DomUtil.create('div', 'parcel speedbox'); d.setAttribute('aria-live', 'polite'); d.hidden = true; return d; }
   });
   var speedBox = new SpeedCtl().addTo(map).getContainer();
-  // Soll: aus dem Durchfluss (Tempo, bei dem die Ist-Menge der Ausbringmenge entspricht), sonst Einstellung
+  // Soll-Tempo = Tempo, bei dem die Ist-Menge der Ausbringmenge entspricht: aus dem gemessenen Durchfluss,
+  // ohne Durchflussmesser aus dem eingestellten Pumpen-Volumenstrom. km/h = m³/h × 10 ÷ (m³/ha × m)
   function sollSpeed() {
-    if (flowActive() && cfg.rate > 0 && cfg.width > 0) return { v: flowAvg() * 0.6 / (cfg.rate * cfg.width), flow: true };
-    return { v: cfg.speed, flow: false };
+    if (!(cfg.rate > 0 && cfg.width > 0)) return { v: null, flow: false };
+    if (flowActive()) return { v: flowAvg() * 0.6 / (cfg.rate * cfg.width), flow: true };
+    if (flow.connected) return { v: null, flow: false };           // Durchflussmesser da, aber kein Durchfluss
+    return { v: cfg.pump * 10 / (cfg.rate * cfg.width), flow: false, pump: true };
   }
   function speedState(v, soll) {
     if (v === null) return null;
@@ -749,12 +752,12 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     return v < soll - TOL ? 'up' : v > soll + TOL ? 'down' : 'ok';
   }
   function renderSpeed(v) {
-    var s = sollSpeed(), st = speedState(v, s.v);
-    // mit Durchflussmesser: Regler ausblenden, berechneten Wert zeigen (ohne Durchfluss, z. B. Pumpe aus: «–»)
-    $('rowSpeed').hidden = flow.connected; $('rowSpeedFlow').hidden = !flow.connected;
-    if (flow.connected) $('speedFlowOut').textContent = s.flow ? s.v.toFixed(1) + ' km/h' : '–';
-    // Durchflussmesser verbunden, aber kein Durchfluss: kein Sollwert, also auch kein Ring/Pfeil
-    var noSoll = flow.connected && !s.flow;
+    var s = sollSpeed(), noSoll = s.v === null, st = speedState(v, noSoll ? 0 : s.v);
+    // mit Durchflussmesser: Pumpen-Regler ausblenden; Soll-Tempo immer berechnet anzeigen
+    $('rowPump').hidden = flow.connected;
+    $('speedFlowOut').textContent = noSoll ? '–' : s.v.toFixed(1) + ' km/h';
+    $('speedFlowSrc').textContent = flow.connected ? 'Berechnet aus dem gemessenen Durchfluss' : 'Berechnet aus Pumpen-Volumenstrom';
+    // kein Sollwert (Durchflussmesser ohne Durchfluss, Ausbringmenge 0): auch kein Ring/Pfeil
     if (noSoll && st !== 'stop') st = st === null ? null : 'ok';
     var sollTxt = noSoll ? '–' : s.v.toFixed(1);
     var txt = { up: 'schneller', down: 'langsamer', stop: 'Stillstand', ok: 'im Soll' };
@@ -766,7 +769,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     // Tempo-Ansicht (grosse Anzeige)
     $('ist').textContent = v === null || v <= STAND ? '–' : v.toFixed(1);
     var turning = !!(rec && rec.turning), off = !!(rec && rec.paused);
-    $('sollLine').textContent = (noSoll ? 'Soll – (kein Durchfluss)' : 'Soll ' + sollTxt + ' km/h · ±' + TOL) + (s.flow ? ' · aus Durchfluss' : '') + (turning ? ' · Wenden' : '') + (off ? ' · unterbrochen' : '');
+    $('sollLine').textContent = (noSoll ? 'Soll – (' + (flow.connected ? 'kein Durchfluss' : 'Ausbringmenge 0') + ')' : 'Soll ' + sollTxt + ' km/h · ±' + TOL) + (s.flow ? ' · aus Durchfluss' : s.pump ? ' · Pumpe ' + cfg.pump + ' m³/h' : '') + (turning ? ' · Wenden' : '') + (off ? ' · unterbrochen' : '');
     // beim Wenden und während der Unterbrechung wie auf der Karte kein Pfeil
     var big = !!(st && st !== 'ok' && !turning && !off);
     $('arrow').hidden = !big;
@@ -917,8 +920,10 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   }
   function actualRate() {
     var v = speedAvg();
-    if (!flowActive() || v === null || v <= STAND || cfg.width <= 0) return null;
-    return flowAvg() * 0.6 / (v * cfg.width);   // m³/ha = l/min × 0.6 ÷ (km/h × m), Durchfluss über 5 s gemittelt
+    if (v === null || v <= STAND || cfg.width <= 0) return null;
+    if (flowActive()) return flowAvg() * 0.6 / (v * cfg.width);   // m³/ha = l/min × 0.6 ÷ (km/h × m), Durchfluss über 5 s gemittelt
+    if (!flow.connected) return cfg.pump * 10 / (v * cfg.width);  // ohne Durchflussmesser: eingestellte Pumpe, m³/h × 10 ÷ (km/h × m)
+    return null;
   }
   function rateColor() {
     var ar = actualRate();
@@ -1047,13 +1052,13 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   showSensorHint();
 
   // ---------- Zustand ----------
-  var cfg = { width: 12, offset: 3, rate: 25, speed: 6, source: 'phone', aOffset: 0, aSide: 0, turnPause: true, headingUp: false, blowSpread: 15, flowCorr: 0 };
-  var KEYS = ['width', 'offset', 'rate', 'speed', 'aOffset', 'aSide', 'blowSpread', 'flowCorr'];
-  var steps = { width: 0.25, offset: 0.5, rate: 1, speed: 0.5, aOffset: 0.05, aSide: 0.05, blowSpread: 1, flowCorr: 1 };
+  var cfg = { width: 12, offset: 3, rate: 25, pump: 120, source: 'phone', aOffset: 0, aSide: 0, turnPause: true, headingUp: false, blowSpread: 15, flowCorr: 0 };
+  var KEYS = ['width', 'offset', 'rate', 'pump', 'aOffset', 'aSide', 'blowSpread', 'flowCorr'];
+  var steps = { width: 0.25, offset: 0.5, rate: 1, pump: 5, aOffset: 0.05, aSide: 0.05, blowSpread: 1, flowCorr: 1 };
   var fmtCfg = {
     flowCorr: function (v) { return (v > 0 ? '+' : '') + v.toFixed(0) + ' %'; },
     blowSpread: function (v) { return '±' + v.toFixed(0) + ' m³/h'; },
-    speed: function (v) { return v.toFixed(1) + ' km/h'; },
+    pump: function (v) { return v.toFixed(0) + ' m³/h'; },
     width: function (v) { return v.toFixed(2) + ' m'; },
     offset: function (v) { return v.toFixed(1) + ' m'; },
     rate: function (v) { return v.toFixed(0) + ' m³/ha'; },
@@ -1063,11 +1068,12 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   var rec = null, saved = null, watchId = null, demoTimer = null, wakeLock = null, follow = true, lastLL = null, lastFixAt = 0, samples = [], clockTimer = null;
 
   // Eine Aufzeichnung = ein ganzer Einsatz (auch mit Verschlauchung über mehrere Parzellen).
-  // Pro Streifen (quad) gespeichert: Fläche qA (m²), Gülle qL (Liter, gemessen), Soll qR (m³/ha), Parzelle qP.
+  // Pro Streifen (quad) gespeichert: Fläche qA (m²), Gülle qL (Liter, gemessen), Menge qR (m³/ha – ohne
+  // Durchflussmesser aus Pumpen-Volumenstrom und Tempo), Parzelle qP.
   function newRec() {
     var now = Date.now();
     return { id: 'r' + now, origin: null, prevBoom: null, ref: null, quads: [], colors: [], track: [], trackDraw: [], cells: new Set(), sum: 0,
-      qA: [], qL: [], qR: [], qP: [], pGeo: {}, pendL: 0,
+      qA: [], qL: [], qR: [], qP: [], pGeo: {}, pendL: 0, calcM3: 0,
       start: now, segStart: now, msBefore: 0, end: null, liters: 0, lastTotal: null, flowSeen: false,
       odo: 0, lastP: null, hist: [], curve: null, turning: false, turns: 0, paused: false, pauses: 0 };
   }
@@ -1135,7 +1141,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       var measured = rec.flowSeen ? rec.liters / 1000 : null;
       // Arbeitsdauer ohne die Unterbrechungen
       var ms = rec.msBefore + (rec.segStart ? (rec.end || Date.now()) - rec.segStart : 0);
-      return { area: area, overlap: rec.sum > 0 ? Math.max(0, rec.sum - rec.cells.size) / rec.sum * 100 : 0, ms: ms, measured: measured, turns: rec.turns };
+      return { area: area, overlap: rec.sum > 0 ? Math.max(0, rec.sum - rec.cells.size) / rec.sum * 100 : 0, ms: ms, measured: measured, calc: rec.calcM3, turns: rec.turns };
     }
     if (saved) return saved.stats;
     return { area: 0, overlap: 0, ms: 0 };
@@ -1154,13 +1160,14 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     renderSpeed(v);
     var st = stats();
     $('sArea').innerHTML = st.area.toFixed(2) + '<small>ha</small>';
-    var amount = st.measured !== null && st.measured !== undefined ? st.measured : st.area * (st.rate || cfg.rate);
+    var amount = st.measured !== null && st.measured !== undefined ? st.measured : typeof st.calc === 'number' ? st.calc : st.area * (st.rate || cfg.rate);
     $('sAmount').innerHTML = Math.round(amount) + '<small>m³</small>';
     $('sOverlap').innerHTML = Math.round(st.overlap) + '<small>%</small>';
     updateActions();
     $('acc').textContent = 'Dauer ' + mmss(st.ms);
     var showFlow = flow.connected || (st.measured !== null && st.measured !== undefined);
-    $('flowStats').hidden = !showFlow; $('legend').hidden = !showFlow;
+    // Farblegende auch ohne Durchflussmesser: die Ist-Menge kommt dann aus Pumpe und Tempo
+    $('flowStats').hidden = !showFlow; $('legend').hidden = !(showFlow || rec);
     if (showFlow) {
       $('sFlow').innerHTML = flowHtml;
       var fi = $('flowInfo');
@@ -1316,7 +1323,10 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       L.polygon(ll, coverStyle(col)).addTo(coverLayer);
       rec.sum += a;
       // Streifen merken: Fläche, Gülle seit dem letzten Streifen, Soll und Parzelle (nach Lage der Streifen-Mitte)
-      rec.qA.push(a); rec.qL.push(rec.flowSeen ? rec.pendL : null); rec.qR.push(cfg.rate); rec.qP.push(null);
+      // ohne Durchflussmesser: Menge auf diesem Streifen aus Pumpen-Volumenstrom und Tempo (= Pumpe × Zeit)
+      var ar = actualRate(), qr = !rec.flowSeen && ar !== null ? ar : cfg.rate;
+      rec.qA.push(a); rec.qL.push(rec.flowSeen ? rec.pendL : null); rec.qR.push(qr); rec.qP.push(null);
+      rec.calcM3 += a / 10000 * qr;
       rec.pendL = 0;
       assignQuad(rec, rec.quads.length - 1);
       rasterize(rec, q);
@@ -1430,6 +1440,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     });
     if (typeof s.sum === 'number') r.sum = s.sum;
     for (i = 0; i < n; i++) if (!r.qP[i]) assignQuad(r, i);
+    r.calcM3 = r.qA.reduce(function (sum, a, j) { return sum + (a || 0) / 10000 * (r.qR[j] || 0); }, 0);
     return r;
   }
   // Fahrspur: Unterbrechungen sind als null gespeichert -> einzelne Abschnitte
@@ -1827,7 +1838,8 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     var hm = function (t) { return t.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' }); };
     var named = sm.parcels.filter(function (p) { return p.key !== '?'; }).length;
     var src = sm.measured ? 'gemessen' + (d.sensor ? ' (' + d.sensor + ')' : ' (Durchflussmesser)') + (c.flowCorr ? ', Korrektur ' + (c.flowCorr > 0 ? '+' : '') + c.flowCorr + ' %' : '')
-                          : 'berechnet aus Fläche × Soll ' + (c.rate || 0) + ' m³/ha (kein Durchflussmesser)';
+                          : c.pump ? 'berechnet aus Pumpen-Volumenstrom ' + c.pump + ' m³/h und Tempo (kein Durchflussmesser)'
+                                   : 'berechnet aus Fläche × Soll ' + (c.rate || 0) + ' m³/ha (kein Durchflussmesser)';
     $('repHead').innerHTML =
       '<div class="stats">' +
       '<div class="stat"><b>' + f1(sm.m3) + '<small>m³</small></b><span>Gülle</span></div>' +
@@ -1888,6 +1900,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       ueberlappung_prozent: Math.round((d.stats && d.stats.overlap) || 0), arbeitsbreite_m: c.width, positionsquelle: c.source === 'antenna' ? 'Antenne' : 'Handy',
       abstand_verteiler_m: c.source === 'antenna' ? c.aOffset : c.offset, seitlicher_versatz_m: c.source === 'antenna' ? c.aSide : 0, ausbringmenge_m3_ha: c.rate,
       wendemanoever: (d.stats && d.stats.turns) || 0, unterbrechungen: d.pauses || 0, durchfluss_korrektur_prozent: c.flowCorr || 0,
+      pumpe_m3_h: measured ? null : (c.pump || null),
       parzellen: sm.parcels.map(function (p) { return p.nr + ': ' + p.m3.toFixed(1) + ' m³ / ' + p.ha.toFixed(2) + ' ha'; }).join('; ') };
   }
   function exportGeo(d) {
