@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#2E3236">
-<title>Gülle-Rechner</title>
+<title>SlurryFlowApp</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
@@ -199,7 +199,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <body>
 <header>
 <img src="arm-signet.png" alt="Arm Eggiwil AG">
-<div class="brand"><b>ARM EGGIWIL AG</b><span>Gülle-Rechner</span></div>
+<div class="brand"><b>ARM EGGIWIL AG</b><span>SlurryFlowApp</span></div>
 <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="Einstellungen öffnen" aria-expanded="false" aria-controls="drawer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
 </header>
 <nav class="tabs" aria-label="Ansicht">
@@ -1727,7 +1727,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   // Dateiname mit Schweizer Ortszeit (nicht UTC)
   function fileBase(d) {
     var t = new Date(d.start || d.date), p = function (n) { return String(n).padStart(2, '0'); };
-    return 'guelle-' + t.getFullYear() + '-' + p(t.getMonth() + 1) + '-' + p(t.getDate()) + '-' + p(t.getHours()) + '-' + p(t.getMinutes());
+    return 'slurryflow-' + t.getFullYear() + '-' + p(t.getMonth() + 1) + '-' + p(t.getDate()) + '-' + p(t.getHours()) + '-' + p(t.getMinutes());
   }
   function esc(s) { return String(s).replace(/[<>&"]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]; }); }
 
