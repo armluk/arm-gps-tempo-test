@@ -176,8 +176,18 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 .rep-label{background:var(--dark);color:#fff;border:0;border-left:3px solid var(--yellow);border-radius:0;box-shadow:none;font:700 12px/1.25 Archivo,'Segoe UI',sans-serif;padding:3px 6px;text-align:left;white-space:nowrap}
 .rep-label:before{display:none}
 .rep-label small{display:block;font-weight:600;color:var(--on-dark)}
-.rep-actions{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px}
-.rep-actions .btn{justify-content:center}
+.rep-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.rep-actions .btn{justify-content:center;padding:12px 8px}
+.rep-actions #repShare{grid-column:1/-1;justify-content:space-between;padding:16px 22px;min-height:56px}
+.rep-actions .btn.busy{opacity:.6;pointer-events:none}
+.rep-cust{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.rep-cust label{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--on-dark)}
+.rep-cust label.wide{grid-column:1/-1}
+.rep-cust input{min-height:44px;padding:8px 10px;border:2px solid var(--fuge);border-radius:0;background:var(--surface);color:#fff;font:600 16px/1.2 Archivo,'Segoe UI',system-ui,sans-serif;letter-spacing:0;text-transform:none}
+.rep-cust input:focus{outline:none;border-color:var(--yellow)}
+.rep-cust input.missing{border-color:var(--error)}
+.rep-cust input::placeholder{color:#8a9196}
+@media (max-width:480px){.rep-cust{grid-template-columns:minmax(0,1fr)}}
 .rep-wait{font-size:13px;color:var(--yellow);margin:0}
 .rep-wait[hidden]{display:none}
 @media print{
@@ -193,6 +203,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   .stat{background:#f2f2f2;color:#000}
   .stat span{color:#444}
   #repMap{height:120mm;break-inside:avoid}
+  .rep-cust input{background:#fff;color:#000;border-color:#999}
 }
 </style>
 </head>
@@ -369,13 +380,20 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <div class="drawer report" id="report" role="dialog" aria-modal="true" aria-labelledby="repTitle" hidden>
 <div class="drawer-head"><b id="repTitle">Bericht</b><button class="icon-btn" id="repClose" type="button" aria-label="Bericht schliessen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button></div>
 <div class="rep-body">
+<div class="rep-cust">
+<label class="wide">Kunde<input id="cuName" list="cuList" autocomplete="off" placeholder="Name oder Betrieb (Pflicht für das PDF)"></label>
+<label>Ort / Adresse<input id="cuAddr" autocomplete="off" placeholder="freiwillig"></label>
+<label>Bemerkung<input id="cuNote" autocomplete="off" placeholder="z. B. Grube Nord, verdünnt 1:1"></label>
+<datalist id="cuList"></datalist>
+</div>
 <p class="rep-wait" id="repWait" hidden>Parzellen werden ermittelt …</p>
 <div id="repHead"></div>
 <div id="repMap" role="img" aria-label="Karte der Ausbringung mit Parzellen"></div>
 <div id="repTable"></div>
 <p class="note">Fläche = tatsächlich befahrene Fläche unter dem Verteiler, Überlappungen nur einmal gezählt. Die Gülle wird dem Streifen zugerechnet, auf dem sie floss – auch wenn über eine Parzellengrenze gefahren wurde. Gülle, die im Stand floss, zählt zum nächsten Streifen. Parzellen nach amtlicher Vermessung (geo.admin.ch), Luftbild © swisstopo.</p>
 <div class="rep-actions">
-<button class="btn" id="repPrint" type="button"><span>Drucken / PDF</span></button>
+<button class="btn" id="repShare" type="button"><span>PDF teilen (WhatsApp, E-Mail …)</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
+<button class="btn line" id="repPdf" type="button">PDF speichern</button>
 <button class="btn line" id="repKml" type="button">KML</button>
 <button class="btn line" id="repGeo" type="button">GeoJSON</button>
 </div>
@@ -1494,7 +1512,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   function recMeta(s) {
     var sm = s.summary || summarize(s);
     var pl = sm.parcels.filter(function (p) { return p.key !== '?'; }).map(function (p) { return p.nr; });
-    return (pl.length ? 'Parzelle ' + pl.join(', ') + ' · ' : '') + sm.ha.toFixed(2) + ' ha · ' + sm.m3.toFixed(1) + ' m³ ' + (sm.measured ? 'gemessen' : 'berechnet') + ' · ' + mmss((s.stats && s.stats.ms) || 0);
+    return (s.customer && s.customer.name ? s.customer.name + ' · ' : '') + (pl.length ? 'Parzelle ' + pl.join(', ') + ' · ' : '') + sm.ha.toFixed(2) + ' ha · ' + sm.m3.toFixed(1) + ' m³ ' + (sm.measured ? 'gemessen' : 'berechnet') + ' · ' + mmss((s.stats && s.stats.ms) || 0);
   }
   function renderRecList() {
     dbAll().then(function (all) {
@@ -1789,9 +1807,13 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     $('report').hidden = false;
     $('report').scrollTop = 0;
     drawReport(d);
+    fillCustomer(d);
+    pdfReset();
     resolveReport(d);
+    setTimeout(function () { if (repData === d) pdfPrepare(d); }, 800);   // Karte fürs PDF schon im Hintergrund zeichnen
   }
   function closeReport() {
+    custSaveNow();
     $('report').hidden = true;
     // nach dem Abschliessen: Karte wieder leer, nur der gelbe Punkt – bereit für die nächste Aufzeichnung
     if (repClear && !rec) { saved = null; coverLayer.clearLayers(); trackLine.setLatLngs([]); }
@@ -1799,7 +1821,8 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     map.invalidateSize(); render();
   }
   $('repClose').addEventListener('click', closeReport);
-  $('repPrint').addEventListener('click', function () { if (repMap) repMap.invalidateSize(); window.print(); });
+  $('repShare').addEventListener('click', function () { pdfAction(true); });
+  $('repPdf').addEventListener('click', function () { pdfAction(false); });
   $('repKml').addEventListener('click', function () { if (repData) exportKml(repData); });
   $('repGeo').addEventListener('click', function () { if (repData) exportGeo(repData); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('report').hidden) closeReport(); });
@@ -1828,7 +1851,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       $('repWait').hidden = true;
       d.summary = summarize(d);
       if (!d.demo && dbOk && !d.open) dbPut(d).catch(function () {});
-      if (repData === d && !$('report').hidden) drawReport(d);
+      if (repData === d && !$('report').hidden) { drawReport(d); pdfReset(); pdfPrepare(d); }
     }
     next();
   }
@@ -1891,12 +1914,316 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     }, 60);
   }
 
+  // ---------- Kunde im Bericht ----------
+  // Früher erfasste Kunden werden vorgeschlagen (Liste auf dem Handy, neueste zuerst)
+  var KUNDEN = STORE + '-kunden', custTimer = null;
+  function custList() { try { return JSON.parse(localStorage.getItem(KUNDEN)) || []; } catch (e) { return []; } }
+  function custRemember(c) {
+    if (!c || !c.name) return;
+    var l = custList().filter(function (x) { return x.name.toLowerCase() !== c.name.toLowerCase(); });
+    l.unshift({ name: c.name, addr: c.addr || '' });
+    try { localStorage.setItem(KUNDEN, JSON.stringify(l.slice(0, 300))); } catch (e) {}
+  }
+  function fillCustomer(d) {
+    var c = d.customer || {};
+    $('cuName').value = c.name || ''; $('cuAddr').value = c.addr || ''; $('cuNote').value = c.note || '';
+    $('cuName').classList.remove('missing');
+    $('cuList').innerHTML = custList().map(function (x) { return '<option value="' + esc(x.name) + '">' + esc(x.addr || '') + '</option>'; }).join('');
+  }
+  function custSaveNow() {
+    clearTimeout(custTimer); custTimer = null;
+    var d = repData;
+    if (!d || d.demo || !d.customer) return;
+    custRemember(d.customer);
+    if (dbOk) dbPut(d).catch(function () {});
+  }
+  function custChanged(e) {
+    if (!repData) return;
+    // bekannter Kunde gewählt: Adresse übernehmen, wenn noch leer
+    if (e.target.id === 'cuName' && !$('cuAddr').value) {
+      var k = custList().filter(function (x) { return x.name === $('cuName').value; })[0];
+      if (k && k.addr) $('cuAddr').value = k.addr;
+    }
+    repData.customer = { name: $('cuName').value.trim(), addr: $('cuAddr').value.trim(), note: $('cuNote').value.trim() };
+    if (repData.customer.name) $('cuName').classList.remove('missing');
+    pdfFile = null; pdfPending = null; setShareLabel();
+    var d = repData;
+    clearTimeout(custTimer);
+    custTimer = setTimeout(function () { if (!d.demo && dbOk) dbPut(d).catch(function () {}); }, 800);   // in der Liste speichern
+  }
+  ['cuName', 'cuAddr', 'cuNote'].forEach(function (id) { $(id).addEventListener('input', custChanged); });
+  $('cuName').addEventListener('change', function () { if (repData && !repData.demo) custRemember(repData.customer); });
+
+  // ---------- PDF: Bericht als A4, zum Teilen per WhatsApp, E-Mail … ----------
+  // jsPDF (MIT-Lizenz) wird erst beim ersten Bericht geladen. Die Karte zeichnet die App selbst aus den
+  // swisstopo-Luftbildkacheln (dürfen kopiert werden), darüber Streifen, Spur, Parzellen und Mengen.
+  var jspdfP = null, logoP = null, mapImgs = new WeakMap(), pdfFile = null, pdfPending = null, pdfBusy = false;
+  function loadJsPdf() {
+    if (window.jspdf) return Promise.resolve(window.jspdf.jsPDF);
+    return jspdfP || (jspdfP = new Promise(function (res, rej) {
+      var s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload = function () { window.jspdf ? res(window.jspdf.jsPDF) : rej(new Error('PDF-Baustein fehlt')); };
+      s.onerror = function () { jspdfP = null; s.remove(); rej(new Error('PDF-Baustein konnte nicht geladen werden (kein Netz?)')); };
+      document.head.appendChild(s);
+    }));
+  }
+  function loadLogo() {
+    return logoP || (logoP = new Promise(function (res) {
+      var i = new Image();
+      // Signet ist weiss auf durchsichtigem Grund: wie in der App auf Schwarz setzen
+      i.onload = function () { var c = document.createElement('canvas'); c.width = i.naturalWidth; c.height = i.naturalHeight; var g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height); g.drawImage(i, 0, 0); res(c.toDataURL('image/png')); };
+      i.onerror = function () { logoP = null; res(null); };
+      i.src = 'arm-signet.png';
+    }));
+  }
+  function lon2x(lon, z) { return (lon + 180) / 360 * 256 * Math.pow(2, z); }
+  function lat2y(lat, z) { var s = Math.sin(lat * D); return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * 256 * Math.pow(2, z); }
+  // Kartenbild (JPEG) für das PDF: Ausschnitt um Streifen und Spur, Norden oben, mit Massstab
+  function mapImage(d, sm) {
+    if (mapImgs.has(d)) return mapImgs.get(d);
+    var W = 1600, H = 1000;
+    var pts = [];
+    (d.quads || []).forEach(function (q) { q.forEach(function (p) { pts.push(p); }); });
+    trackPts(d.track).forEach(function (p) { pts.push(p); });
+    if (!pts.length) return Promise.resolve(null);
+    var minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+    pts.forEach(function (p) { minLat = Math.min(minLat, p[0]); maxLat = Math.max(maxLat, p[0]); minLon = Math.min(minLon, p[1]); maxLon = Math.max(maxLon, p[1]); });
+    var dx0 = Math.max(lon2x(maxLon, 0) - lon2x(minLon, 0), 1e-7), dy0 = Math.max(lat2y(minLat, 0) - lat2y(maxLat, 0), 1e-7);
+    var fit = Math.min(W * 0.82 / dx0, H * 0.82 / dy0);
+    var z = Math.max(10, Math.min(19, Math.floor(Math.log2(fit))));
+    var k = fit / Math.pow(2, z);                     // Vergrösserung der Kacheln (meist 1…2)
+    var cx = (lon2x(minLon, z) + lon2x(maxLon, z)) / 2, cy = (lat2y(minLat, z) + lat2y(maxLat, z)) / 2;
+    function px(p) { return [(lon2x(p[1], z) - cx) * k + W / 2, (lat2y(p[0], z) - cy) * k + H / 2]; }
+    var cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    var g = cv.getContext('2d');
+    g.fillStyle = '#d9d9d9'; g.fillRect(0, 0, W, H);
+    var tx0 = Math.floor((cx - W / 2 / k) / 256), tx1 = Math.floor((cx + W / 2 / k) / 256);
+    var ty0 = Math.floor((cy - H / 2 / k) / 256), ty1 = Math.floor((cy + H / 2 / k) / 256);
+    var loads = [];
+    for (var tx = tx0; tx <= tx1; tx++) for (var ty = ty0; ty <= ty1; ty++) {
+      loads.push(new Promise(function (res) {
+        var x = tx, y = ty, img = new Image();
+        img.crossOrigin = 'anonymous';
+        var to = setTimeout(function () { res(); }, 10000);
+        img.onload = function () { clearTimeout(to); g.drawImage(img, (x * 256 - cx) * k + W / 2, (y * 256 - cy) * k + H / 2, 256 * k + 0.5, 256 * k + 0.5); res(); };
+        img.onerror = function () { clearTimeout(to); res(); };
+        img.src = 'https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/' + z + '/' + x + '/' + y + '.jpeg';
+      }));
+    }
+    var p = Promise.all(loads).then(function () {
+      function path(list) { g.beginPath(); list.forEach(function (pt, i) { var q = px(pt); if (i) g.lineTo(q[0], q[1]); else g.moveTo(q[0], q[1]); }); }
+      // begüllte Streifen (Farbe wie auf der Karte)
+      g.globalAlpha = 0.5;
+      (d.quads || []).forEach(function (q, i) { path(q); g.closePath(); g.fillStyle = (d.colors && d.colors[i]) || YELLOW; g.fill(); });
+      g.globalAlpha = 1;
+      // Fahrspur
+      g.strokeStyle = '#FFFFFF'; g.lineWidth = 2; g.lineJoin = 'round';
+      trackSegs(d.track).forEach(function (s) { path(s); g.stroke(); });
+      // Parzellengrenzen gestrichelt (gelb mit dunklem Rand, gut sichtbar auf dem Luftbild)
+      sm.parcels.forEach(function (pc) {
+        var geo = d.pGeo && d.pGeo[pc.key];
+        if (!geo) return;
+        geo.polys.forEach(function (poly) { poly.forEach(function (ring) {
+          path(ring); g.closePath();
+          g.setLineDash([]); g.strokeStyle = 'rgba(0,0,0,.55)'; g.lineWidth = 6; g.stroke();
+          g.setLineDash([16, 10]); g.strokeStyle = '#FFF005'; g.lineWidth = 3; g.stroke();
+        }); });
+      });
+      g.setLineDash([]);
+      // Beschriftung: Parzelle und Menge in der Mitte der begüllten Streifen
+      sm.parcels.forEach(function (pc) {
+        if (pc.key === '?') return;
+        var lat = 0, lon = 0, n = 0;
+        (d.quads || []).forEach(function (q, i) { if ((d.qP && d.qP[i]) === pc.key) { var c = quadCenter(q); lat += c[0]; lon += c[1]; n++; } });
+        if (!n) return;
+        var c = px([lat / n, lon / n]), t1 = String(pc.nr), t2 = f1(pc.m3) + ' m³';
+        g.font = '700 30px Archivo, Arial, sans-serif'; var w1 = g.measureText(t1).width;
+        g.font = '600 24px Archivo, Arial, sans-serif'; var w2 = g.measureText(t2).width;
+        var bw = Math.max(w1, w2) + 30, bh = 70, bx = c[0] - bw / 2, by = c[1] - bh / 2;
+        g.fillStyle = 'rgba(46,50,54,.92)'; g.fillRect(bx, by, bw, bh);
+        g.fillStyle = '#FFF005'; g.fillRect(bx, by, 6, bh);
+        g.fillStyle = '#FFFFFF'; g.font = '700 30px Archivo, Arial, sans-serif'; g.fillText(t1, bx + 18, by + 32);
+        g.fillStyle = '#C9CFD3'; g.font = '600 24px Archivo, Arial, sans-serif'; g.fillText(t2, bx + 18, by + 60);
+      });
+      // Massstab unten links
+      var midLat = (minLat + maxLat) / 2, mpp = 156543.03 * Math.cos(midLat * D) / Math.pow(2, z) / k;
+      var len = [10, 20, 50, 100, 200, 500, 1000].filter(function (m) { return m / mpp <= 300; }).pop() || 10, lp = len / mpp;
+      g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(20, H - 70, lp + 40, 50);
+      g.fillStyle = '#000'; g.fillRect(40, H - 38, lp, 6);
+      g.font = '600 22px Archivo, Arial, sans-serif'; g.fillText(len + ' m', 40, H - 46);
+      g.font = '700 26px Archivo, Arial, sans-serif'; g.fillText('N ↑', W - 80, 44);
+      try { return { url: cv.toDataURL('image/jpeg', 0.72), w: W, h: H }; }   // ~0.4 MB, gut für WhatsApp/E-Mail
+      catch (e) { return null; }                         // Luftbild gesperrt: PDF ohne Karte
+    });
+    mapImgs.set(d, p);
+    return p;
+  }
+  function pdfReset() { pdfFile = null; pdfPending = null; if (repData) mapImgs.delete(repData); setShareLabel(); }
+  function pdfPrepare(d) { loadJsPdf().catch(function () {}); loadLogo(); mapImage(d, d.summary || summarize(d)).catch(function () {}); }
+  function pdfName(d) {
+    var t = new Date(d.start || d.date), p = function (n) { return String(n).padStart(2, '0'); };
+    var who = ((d.customer && d.customer.name) || 'Kunde').replace(/[\\/:*?"<>|,;]+/g, '').replace(/\s+/g, '-').slice(0, 40);
+    return 'Guelle-Bericht_' + who + '_' + t.getFullYear() + '-' + p(t.getMonth() + 1) + '-' + p(t.getDate()) + '.pdf';
+  }
+  function buildPdf(d) {
+    var sm = d.summary || summarize(d);
+    return Promise.all([loadJsPdf(), loadLogo(), mapImage(d, sm)]).then(function (r) {
+      var JsPDF = r[0], logo = r[1], img = r[2], st = d.stats || {}, c = d.cfg || cfg, cu = d.customer || {};
+      var doc = new JsPDF({ unit: 'mm', format: 'a4', compress: true }), L0 = 15, R0 = 195, y;
+      var t0 = new Date(d.start || d.date), t1 = d.end ? new Date(d.end) : null;
+      var hm = function (t) { return t.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' }); };
+      var dash = function (s) { return String(s).replace(/[–—]/g, '-'); };
+      function gray() { doc.setTextColor(95, 102, 108); }
+      function black() { doc.setTextColor(20, 22, 24); }
+      // Kopf: Signet, Firma, Titel
+      if (logo) doc.addImage(logo, 'PNG', L0, 11, 15, 15);
+      black(); doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.text('ARM EGGIWIL AG', L0 + 19, 17.5);
+      gray(); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text('Landmaschinen · Mechanische Werkstatt · Tel. 034 491 11 13', L0 + 19, 23);
+      black(); doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text(d.demo ? 'Bericht (Demo)' : 'Bericht Gülleausbringung', R0, 17.5, { align: 'right' });
+      gray(); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text(t0.toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' }), R0, 23, { align: 'right' });
+      doc.setFillColor(255, 240, 5); doc.rect(L0, 29, R0 - L0, 1.6, 'F');
+      doc.setFillColor(46, 50, 54); doc.rect(L0, 30.6, R0 - L0, 0.4, 'F');
+      // Kunde links, Einsatz rechts
+      y = 38;
+      gray(); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.text('KUNDE', L0, y); doc.text('EINSATZ', 118, y);
+      black(); doc.setFontSize(12); doc.text(doc.splitTextToSize(cu.name || '-', 95)[0], L0, y + 6);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+      var ly = y + 11.5;
+      if (cu.addr) { doc.splitTextToSize(cu.addr, 95).slice(0, 2).forEach(function (l) { doc.text(l, L0, ly); ly += 4.6; }); }
+      if (cu.note) { doc.setFont('helvetica', 'italic'); doc.splitTextToSize(cu.note, 95).slice(0, 3).forEach(function (l) { doc.text(l, L0, ly); ly += 4.6; }); doc.setFont('helvetica', 'normal'); }
+      var info = [
+        ['Datum', t0.toLocaleDateString('de-CH', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })],
+        ['Zeit', hm(t0) + (t1 ? ' - ' + hm(t1) : '')],
+        ['Arbeitszeit', mmss(st.ms || 0) + (d.pauses ? ' (' + d.pauses + '× unterbrochen)' : '')],
+        ['Arbeitsbreite', (c.width || 0).toFixed(2) + ' m · Soll ' + (c.rate || 0) + ' m³/ha']
+      ];
+      var iy = y + 6;
+      info.forEach(function (row) { gray(); doc.setFontSize(8.5); doc.text(row[0], 118, iy); black(); doc.setFontSize(9.5); doc.text(row[1], 141, iy); iy += 5; });
+      // Kennzahlen
+      y = Math.max(ly, iy) + 3;
+      var boxes = [[f1(sm.m3) + ' m³', 'Gülle'], [sm.ha.toFixed(2) + ' ha', 'Fläche'], [f1(sm.rate) + ' m³/ha', 'Ø Menge'],
+                   [String(sm.parcels.filter(function (p) { return p.key !== '?'; }).length), 'Parzellen']];
+      var bw = (R0 - L0 - 6) / 4;
+      boxes.forEach(function (b, i) {
+        var bx = L0 + i * (bw + 2);
+        doc.setFillColor(242, 242, 242); doc.rect(bx, y, bw, 16, 'F');
+        doc.setFillColor(255, 240, 5); doc.rect(bx, y, bw, 0.9, 'F');
+        black(); doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text(b[0], bx + 3, y + 8.5);
+        gray(); doc.setFontSize(7.5); doc.text(b[1].toUpperCase(), bx + 3, y + 13.5);
+      });
+      y += 21;
+      var src = sm.measured ? 'gemessen' + (d.sensor ? ' mit ' + d.sensor : ' (Durchflussmesser)') + (c.flowCorr ? ', Korrektur ' + (c.flowCorr > 0 ? '+' : '') + c.flowCorr + ' %' : '')
+              : c.pump ? 'berechnet aus Pumpen-Volumenstrom ' + c.pump + ' m³/h und Tempo' : 'berechnet aus Fläche × Soll';
+      gray(); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+      doc.text('Gülle: ' + src + ' · Überlappung ' + Math.round(st.overlap || 0) + ' %', L0, y);
+      y += 4;
+      // Karte
+      if (img) {
+        var mw = R0 - L0, mh = mw * img.h / img.w;
+        doc.addImage(img.url, 'JPEG', L0, y, mw, mh);
+        doc.setDrawColor(46, 50, 54); doc.setLineWidth(0.3); doc.rect(L0, y, mw, mh);
+        y += mh + 3;
+        gray(); doc.setFontSize(7); doc.text('Gelb = Soll ±10 %, Weiss = unter 90 %, Rot = über 110 % · gestrichelt = Parzellengrenze · weisse Linie = Fahrspur', L0, y + 1);
+        y += 6;
+      }
+      // Tabelle pro Parzelle
+      var cols = [L0 + 2, 60, 128, 152, 175, R0 - 2];   // Parzelle | Kanton/E-GRID | Fläche | Gülle | m³/ha (rechtsbündig)
+      function head() {
+        doc.setFillColor(46, 50, 54); doc.rect(L0, y, R0 - L0, 7, 'F');
+        doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+        doc.text('PARZELLE', cols[0], y + 4.8); doc.text('KANTON · E-GRID', cols[1], y + 4.8);
+        doc.text('FLÄCHE HA', 149, y + 4.8, { align: 'right' }); doc.text('GÜLLE M³', 172, y + 4.8, { align: 'right' }); doc.text('M³/HA', cols[5], y + 4.8, { align: 'right' });
+        y += 7;
+      }
+      function newPageIfNeeded(h) { if (y + h > 280) { doc.addPage(); y = 18; head(); } }
+      head();
+      sm.parcels.forEach(function (p, i) {
+        newPageIfNeeded(7);
+        if (i % 2) { doc.setFillColor(246, 246, 246); doc.rect(L0, y, R0 - L0, 7, 'F'); }
+        var unk = p.key === '?';
+        black(); doc.setFont('helvetica', unk ? 'italic' : 'bold'); doc.setFontSize(9.5);
+        doc.text(unk ? 'ohne Zuordnung' : 'Parzelle ' + p.nr, cols[0], y + 4.8);
+        gray(); doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+        doc.text(unk ? 'kein Netz' : [p.ak, p.egrid].filter(Boolean).join(' · '), cols[1], y + 4.8);
+        black(); doc.setFontSize(9.5);
+        doc.text(p.ha.toFixed(2), 149, y + 4.8, { align: 'right' }); doc.text(f1(p.m3), 172, y + 4.8, { align: 'right' }); doc.text(f1(p.rate), cols[5], y + 4.8, { align: 'right' });
+        y += 7;
+      });
+      newPageIfNeeded(9);
+      doc.setDrawColor(46, 50, 54); doc.setLineWidth(0.5); doc.line(L0, y, R0, y);
+      black(); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+      doc.text('Total', cols[0], y + 5.5);
+      doc.text(sm.ha.toFixed(2), 149, y + 5.5, { align: 'right' }); doc.text(f1(sm.m3), 172, y + 5.5, { align: 'right' }); doc.text(f1(sm.rate), cols[5], y + 5.5, { align: 'right' });
+      y += 11;
+      newPageIfNeeded(10);
+      gray(); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+      doc.splitTextToSize('Fläche = tatsächlich befahrene Fläche unter dem Verteiler, Überlappungen nur einmal gezählt. Die Gülle ist dem Streifen zugerechnet, auf dem sie floss – auch über Parzellengrenzen hinweg.', R0 - L0)
+        .forEach(function (l) { doc.text(dash(l), L0, y); y += 3.6; });
+      // Fusszeile auf jeder Seite
+      var pages = doc.getNumberOfPages(), now = new Date();
+      for (var pg = 1; pg <= pages; pg++) {
+        doc.setPage(pg); gray(); doc.setFontSize(7);
+        doc.text('Erstellt mit SlurryFlowApp am ' + now.toLocaleDateString('de-CH') + ' ' + hm(now) + ' · Parzellen: amtliche Vermessung (geo.admin.ch) · Luftbild © swisstopo', L0, 290);
+        doc.text('Seite ' + pg + '/' + pages, R0, 290, { align: 'right' });
+      }
+      var blob = doc.output('blob');
+      return new File([blob], pdfName(d), { type: 'application/pdf' });
+    });
+  }
+  function setShareLabel() {
+    var b = $('repShare');
+    setLabel(b, pdfPending ? 'PDF bereit – jetzt teilen' : 'PDF teilen (WhatsApp, E-Mail …)');
+  }
+  function repNote(t) { $('repWait').textContent = t; $('repWait').hidden = !t; }
+  function saveFile(file) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(file); a.download = file.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  }
+  function shareText(d) {
+    var sm = d.summary || summarize(d), t = new Date(d.start || d.date);
+    return 'Gülle-Bericht ' + ((d.customer && d.customer.name) || '') + ', ' + t.toLocaleDateString('de-CH') + ': ' + f1(sm.m3) + ' m³ auf ' + sm.ha.toFixed(2) + ' ha';
+  }
+  function canShareFile(file) { try { return !!(navigator.canShare && navigator.share && navigator.canShare({ files: [file] })); } catch (e) { return false; } }
+  function doShare(file, d) {
+    return navigator.share({ files: [file], title: file.name, text: shareText(d) }).then(function () { pdfPending = null; setShareLabel(); repNote(''); }, function (e) {
+      if (e && e.name === 'AbortError') { pdfPending = null; setShareLabel(); return; }           // im Teilen-Menü abgebrochen
+      if (e && e.name === 'NotAllowedError') { pdfPending = file; setShareLabel(); repNote('PDF ist bereit – bitte nochmals auf «Jetzt teilen» tippen.'); return; }
+      saveFile(file); repNote('Teilen ging nicht – das PDF wurde heruntergeladen.');
+    });
+  }
+  function pdfAction(share) {
+    var d = repData;
+    if (!d || pdfBusy) return;
+    if (!d.customer || !d.customer.name) {
+      $('cuName').classList.add('missing'); $('cuName').focus();
+      repNote('Bitte zuerst den Kunden eingeben.'); return;
+    }
+    custSaveNow();
+    // PDF schon fertig (zweites Tippen nach «PDF bereit»): sofort teilen, solange der Tipp «frisch» ist
+    if (share && pdfPending) { doShare(pdfPending, d); return; }
+    var btn = $(share ? 'repShare' : 'repPdf');
+    pdfBusy = true; btn.classList.add('busy'); repNote('PDF wird erstellt …');
+    (pdfFile ? Promise.resolve(pdfFile) : buildPdf(d)).then(function (file) {
+      if (repData !== d) return;
+      pdfFile = file; repNote('');
+      if (share && canShareFile(file)) return doShare(file, d);
+      saveFile(file);
+      if (share) repNote('Teilen ist auf diesem Gerät nicht möglich – das PDF wurde heruntergeladen.');
+    }).catch(function (e) {
+      repNote('PDF konnte nicht erstellt werden: ' + ((e && e.message) || e));
+    }).then(function () { pdfBusy = false; btn.classList.remove('busy'); });
+  }
+
   // ---------- Export ----------
   $('dlGeo').addEventListener('click', function () { exportGeo(current()); });
   $('dlKml').addEventListener('click', function () { exportKml(current()); });
   function props(d, sm) {
     var measured = sm.measured, c = d.cfg || cfg;
-    return { datum: d.date, flaeche_ha: Number(sm.ha.toFixed(3)), menge_m3: Number(sm.m3.toFixed(1)), menge_quelle: measured ? 'Durchflussmesser' : 'berechnet',
+    var cu = d.customer || {};
+    return { kunde: cu.name || '', kunde_adresse: cu.addr || '', bemerkung: cu.note || '', datum: d.date, flaeche_ha: Number(sm.ha.toFixed(3)), menge_m3: Number(sm.m3.toFixed(1)), menge_quelle: measured ? 'Durchflussmesser' : 'berechnet',
       ueberlappung_prozent: Math.round((d.stats && d.stats.overlap) || 0), arbeitsbreite_m: c.width, positionsquelle: c.source === 'antenna' ? 'Antenne' : 'Handy',
       abstand_verteiler_m: c.source === 'antenna' ? c.aOffset : c.offset, seitlicher_versatz_m: c.source === 'antenna' ? c.aSide : 0, ausbringmenge_m3_ha: c.rate,
       wendemanoever: (d.stats && d.stats.turns) || 0, unterbrechungen: d.pauses || 0, durchfluss_korrektur_prozent: c.flowCorr || 0,
