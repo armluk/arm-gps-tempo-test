@@ -16,7 +16,9 @@ body{display:flex;flex-direction:column;min-height:100vh}
 header{height:64px;flex:none;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid var(--surface)}
 header img{width:44px;height:44px;background:#000;display:block}
 .brand b{display:block;font-size:14px;font-weight:900;letter-spacing:.02em}
-.brand span{font-size:11px;color:var(--on-dark)}
+.brand span{display:block;font-size:11px;line-height:1.3;color:var(--on-dark)}
+.brand .slogan{font-weight:600;color:#fff}
+.brand .appname{font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--yellow)}
 nav.tabs{display:grid;grid-template-columns:1fr 1fr;flex:none;border-bottom:1px solid var(--surface)}
 nav.tabs a{display:flex;align-items:center;justify-content:center;min-height:44px;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--on-dark);text-decoration:none;border-bottom:4px solid transparent}
 nav.tabs a[aria-current]{color:#fff;border-bottom-color:var(--yellow)}
@@ -126,7 +128,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   body{min-height:0;height:100vh;height:100dvh}
   header{height:48px}
   header img{width:36px;height:36px}
-  .brand span{display:none}
+  .brand .appname{display:none}                         /* Querformat: wenig Höhe – nur Firma und Slogan */
   .icon-btn.menu-btn{width:40px;height:40px}
   nav.tabs a{min-height:36px}
   .work{flex-direction:row}
@@ -210,7 +212,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <body>
 <header>
 <img src="arm-signet.png" alt="Arm Eggiwil AG">
-<div class="brand"><b>ARM EGGIWIL AG</b><span>SlurryFlowApp</span></div>
+<div class="brand"><b>ARM EGGIWIL AG</b><span class="slogan">Güllentechnik auf höchstem Level</span><span class="appname">SlurryFlowApp</span></div>
 <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="Einstellungen öffnen" aria-expanded="false" aria-controls="drawer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
 </header>
 <nav class="tabs" aria-label="Ansicht">
@@ -1917,6 +1919,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   // ---------- Kunde im Bericht ----------
   // Früher erfasste Kunden werden vorgeschlagen (Liste auf dem Handy, neueste zuerst)
   var KUNDEN = STORE + '-kunden', custTimer = null;
+  var SLOGAN = 'Güllentechnik auf höchstem Level';
   function custList() { try { return JSON.parse(localStorage.getItem(KUNDEN)) || []; } catch (e) { return []; } }
   function custRemember(c) {
     if (!c || !c.name) return;
@@ -2077,15 +2080,16 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       function gray() { doc.setTextColor(95, 102, 108); }
       function black() { doc.setTextColor(20, 22, 24); }
       // Kopf: Signet, Firma, Titel
-      if (logo) doc.addImage(logo, 'PNG', L0, 11, 15, 15);
-      black(); doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.text('ARM EGGIWIL AG', L0 + 19, 17.5);
-      gray(); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text('Landmaschinen · Mechanische Werkstatt · Tel. 034 491 11 13', L0 + 19, 23);
-      black(); doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text(d.demo ? 'Bericht (Demo)' : 'Bericht Gülleausbringung', R0, 17.5, { align: 'right' });
-      gray(); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text(t0.toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' }), R0, 23, { align: 'right' });
-      doc.setFillColor(255, 240, 5); doc.rect(L0, 29, R0 - L0, 1.6, 'F');
-      doc.setFillColor(46, 50, 54); doc.rect(L0, 30.6, R0 - L0, 0.4, 'F');
+      if (logo) doc.addImage(logo, 'PNG', L0, 11, 17, 17);
+      black(); doc.setFont('helvetica', 'bold'); doc.setFontSize(14); doc.text('ARM EGGIWIL AG', L0 + 21, 16.5);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.text(SLOGAN, L0 + 21, 21.8);
+      gray(); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.text('Landmaschinen · Mechanische Werkstatt · Tel. 034 491 11 13', L0 + 21, 26.5);
+      black(); doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.text(d.demo ? 'Bericht (Demo)' : 'Bericht Gülleausbringung', R0, 16.5, { align: 'right' });
+      gray(); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text(t0.toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' }), R0, 21.8, { align: 'right' });
+      doc.setFillColor(255, 240, 5); doc.rect(L0, 31, R0 - L0, 1.6, 'F');
+      doc.setFillColor(46, 50, 54); doc.rect(L0, 32.6, R0 - L0, 0.4, 'F');
       // Kunde links, Einsatz rechts
-      y = 38;
+      y = 40;
       gray(); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.text('KUNDE', L0, y); doc.text('EINSATZ', 118, y);
       black(); doc.setFontSize(12); doc.text(doc.splitTextToSize(cu.name || '-', 95)[0], L0, y + 6);
       doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
