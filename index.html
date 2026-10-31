@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#2E3236">
-<title>Güllefass-Rechner</title>
+<title>Gülle-Rechner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
@@ -115,9 +115,10 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 .rec-item b{font-size:14px;font-weight:900}
 .rec-item .meta{font-size:12px;color:var(--on-dark);line-height:1.4}
 .rec-item .tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;margin-left:6px;background:var(--yellow);color:var(--dark);vertical-align:2px}
-.rec-btns{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
-.rec-btns button{min-height:40px;border:1px solid #fff;background:transparent;color:#fff;font:700 11px/1 Archivo,'Segoe UI',system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.rec-btns{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.rec-btns button{min-height:40px;padding:0 2px;border:1px solid #fff;background:transparent;color:#fff;font:700 10px/1 Archivo,'Segoe UI',system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
 .rec-btns button:active{background:var(--yellow);color:var(--dark);border-color:var(--yellow)}
+.rec-btns button[data-act="rep"]{background:var(--yellow);border-color:var(--yellow);color:var(--dark)}
 .rec-btns button[data-act="del"]{border-color:var(--on-dark);color:var(--on-dark)}
 /* Querformat (Handy quer in der Halterung): Karte links, Werte und Tasten rechts, ohne Scrollen */
 @media (orientation:landscape) and (max-height:600px){
@@ -155,12 +156,50 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 .foot{display:flex;justify-content:space-between;gap:8px;padding:10px 16px;border-top:1px solid var(--dark);font-size:12px;font-weight:600;color:var(--on-dark)}
 .btn[hidden]{display:none}
 @media (max-width:360px){.ist{font-size:68px}.arrow,.arrow .tile{width:92px}.arrow .tile{height:92px}}
+/* Unterbrochen: Status gut sichtbar */
+.status.paused{color:var(--yellow)}
+.status.paused .rec-dot{background:transparent;border:2px solid var(--yellow);width:9px;height:9px}
+.status.warn{color:#fff;background:var(--error);padding:6px 8px}
+/* Bericht nach «Abschliessen» */
+.report .rep-body{padding:16px;display:flex;flex-direction:column;gap:14px;max-width:760px;margin:0 auto}
+.rep-meta{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px;line-height:1.4}
+.rep-meta dt{color:var(--on-dark);font-weight:700}
+.rep-meta dd{margin:0;font-weight:600}
+.rep-table{width:100%;border-collapse:collapse;font-size:14px}
+.rep-table th{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--on-dark);text-align:right;padding:8px 6px;border-bottom:2px solid var(--yellow)}
+.rep-table th:first-child,.rep-table td:first-child{text-align:left}
+.rep-table td{padding:9px 6px;text-align:right;border-bottom:1px solid var(--fuge);font-variant-numeric:tabular-nums}
+.rep-table td small{display:block;font-size:11px;color:var(--on-dark);font-weight:600}
+.rep-table tr.sum td{font-weight:900;border-bottom:0;border-top:2px solid var(--on-dark)}
+.rep-table tr.unknown td{color:var(--on-dark)}
+#repMap{height:340px;background:#1f2225}
+.rep-label{background:var(--dark);color:#fff;border:0;border-left:3px solid var(--yellow);border-radius:0;box-shadow:none;font:700 12px/1.25 Archivo,'Segoe UI',sans-serif;padding:3px 6px;text-align:left;white-space:nowrap}
+.rep-label:before{display:none}
+.rep-label small{display:block;font-weight:600;color:var(--on-dark)}
+.rep-actions{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px}
+.rep-actions .btn{justify-content:center}
+.rep-wait{font-size:13px;color:var(--yellow);margin:0}
+.rep-wait[hidden]{display:none}
+@media print{
+  body{background:#fff;color:#000;display:block;min-height:0}
+  body>*:not(#report){display:none !important}
+  #report{position:static;overflow:visible;background:#fff;color:#000;padding:0}
+  #report .drawer-head{position:static;background:#fff;color:#000;border-bottom:3px solid #000}
+  #report .icon-btn,.rep-actions,.rep-wait{display:none !important}
+  .rep-meta dt,.rep-table th,.rep-table td small,.rep-table tr.unknown td,.note{color:#444}
+  .rep-table th{border-bottom-color:#000}
+  .rep-table td{border-bottom-color:#bbb}
+  .stats{background:#bbb;border-color:#bbb}
+  .stat{background:#f2f2f2;color:#000}
+  .stat span{color:#444}
+  #repMap{height:120mm;break-inside:avoid}
+}
 </style>
 </head>
 <body>
 <header>
 <img src="arm-signet.png" alt="Arm Eggiwil AG">
-<div class="brand"><b>ARM EGGIWIL AG</b><span>Güllefass-Rechner</span></div>
+<div class="brand"><b>ARM EGGIWIL AG</b><span>Gülle-Rechner</span></div>
 <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="Einstellungen öffnen" aria-expanded="false" aria-controls="drawer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
 </header>
 <nav class="tabs" aria-label="Ansicht">
@@ -207,8 +246,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <p class="msg" id="msg" hidden></p>
 
 <div class="actions" id="actions">
-<button class="btn line spread" id="spreadBtn" type="button" hidden aria-pressed="true"><span>Ausbringen ein</span></button>
-<button class="btn" id="resumeBtn" type="button" hidden><span>Fortsetzen</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
+<button class="btn line" id="pauseBtn" type="button" hidden><span>Unterbrechen</span></button>
 <button class="btn" id="startStop" type="button"><span>Aufzeichnung starten</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
 </div>
 
@@ -219,7 +257,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <div class="drawer-head"><b id="drawerTitle">Einstellungen</b><button class="icon-btn" id="menuClose" type="button" aria-label="Einstellungen schliessen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button></div>
 
 <section class="group">
-<h2>Fass &amp; Ausbringung</h2>
+<h2>Ausbringung</h2>
 <div class="set">
 <div class="set-row">
 <div class="set-head"><label for="width">Arbeitsbreite</label><output id="widthOut">12.00 m</output></div>
@@ -302,7 +340,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <h2>Aufzeichnungen</h2>
 <div class="set">
 <div class="rec-list" id="recList"><p class="note">Noch keine Aufzeichnungen.</p></div>
-<p class="note">Jedes Fass ist eine eigene Aufzeichnung. Alle bleiben auf diesem Handy gespeichert, bis die Übertragung auf einen Server eingerichtet ist.</p>
+<p class="note">Eine Aufzeichnung umfasst den ganzen Einsatz – auch mit Unterbrüchen und über mehrere Parzellen (z. B. mit der Verschlauchung). Mit «Abschliessen» entsteht der Bericht: wie viel Gülle auf welcher Parzelle. Alle Aufzeichnungen bleiben auf diesem Handy gespeichert, bis die Übertragung auf einen Server eingerichtet ist.</p>
 </div>
 </section>
 
@@ -326,6 +364,22 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <p class="note">Die Demo fährt simuliert über eine Wiese. Sie verändert keine gespeicherte Karte – nach dem Stoppen ist die letzte echte Karte wieder da.</p>
 </div>
 </section>
+</div>
+
+<div class="drawer report" id="report" role="dialog" aria-modal="true" aria-labelledby="repTitle" hidden>
+<div class="drawer-head"><b id="repTitle">Bericht</b><button class="icon-btn" id="repClose" type="button" aria-label="Bericht schliessen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button></div>
+<div class="rep-body">
+<p class="rep-wait" id="repWait" hidden>Parzellen werden ermittelt …</p>
+<div id="repHead"></div>
+<div id="repMap" role="img" aria-label="Karte der Ausbringung mit Parzellen"></div>
+<div id="repTable"></div>
+<p class="note">Fläche = tatsächlich befahrene Fläche unter dem Verteiler, Überlappungen nur einmal gezählt. Die Gülle wird dem Streifen zugerechnet, auf dem sie floss – auch wenn über eine Parzellengrenze gefahren wurde. Gülle, die im Stand floss, zählt zum nächsten Streifen. Parzellen nach amtlicher Vermessung (geo.admin.ch), Luftbild © swisstopo.</p>
+<div class="rep-actions">
+<button class="btn" id="repPrint" type="button"><span>Drucken / PDF</span></button>
+<button class="btn line" id="repKml" type="button">KML</button>
+<button class="btn line" id="repGeo" type="button">GeoJSON</button>
+</div>
+</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -584,29 +638,86 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     onAdd: function () { var d = L.DomUtil.create('div', 'parcel'); d.setAttribute('aria-live', 'polite'); d.hidden = true; return d; }
   });
   var parcelBox = new ParcelCtl().addTo(map).getContainer();
+  // Parzellen werden mit Umriss geladen und hier gemerkt. So lässt sich jeder Streifen genau der Parzelle
+  // zuordnen, auf der er liegt – auch an der Grenze und ohne erneute Abfrage (Funkloch).
+  var pcache = {};                       // Schlüssel (EGRID) -> { key, nr, ak, egrid, polys: [[[lat,lon]…], Löcher…]…], bb }
   var parcel = { busy: false, ll: null, t: 0, timer: null, cur: null };
+  function inRing(ring, lat, lon) {
+    var inside = false;
+    for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      var a = ring[i], b = ring[j];
+      if ((a[0] > lat) !== (b[0] > lat) && lon < (b[1] - a[1]) * (lat - a[0]) / (b[0] - a[0]) + a[1]) inside = !inside;
+    }
+    return inside;
+  }
+  function inParcel(p, lat, lon) {
+    if (lat < p.bb[0] || lat > p.bb[2] || lon < p.bb[1] || lon > p.bb[3]) return false;
+    return p.polys.some(function (poly) {
+      return inRing(poly[0], lat, lon) && !poly.slice(1).some(function (h) { return inRing(h, lat, lon); });
+    });
+  }
+  function parcelAt(lat, lon, list) {
+    var src = list || pcache;
+    for (var k in src) if (src[k].polys && inParcel(src[k], lat, lon)) return src[k];
+    return null;
+  }
+  function parcelName(p) { return p ? (p.ak ? p.ak + ' ' : '') + p.nr : '–'; }
+  // Abfrage bei geo.admin.ch (Layer CadastralWebMap), mit Umriss in WGS84
+  function parcelFetch(lat, lon) {
+    var url = 'https://api3.geo.admin.ch/rest/services/ech/MapServer/identify?geometryType=esriGeometryPoint&sr=4326&tolerance=0&returnGeometry=true&geometryFormat=geojson&lang=de'
+      + '&layers=all:ch.kantone.cadastralwebmap-farbe&geometry=' + lon.toFixed(7) + ',' + lat.toFixed(7)
+      + '&mapExtent=' + [lon - 0.001, lat - 0.001, lon + 0.001, lat + 0.001].map(function (n) { return n.toFixed(7); }).join(',') + '&imageDisplay=100,100,96';
+    return fetch(url).then(function (r) { return r.ok ? r.json() : Promise.reject(); }).then(function (j) {
+      var res = j.results && j.results[0];
+      var a = res && (res.properties || res.attributes), g = res && res.geometry;
+      if (!a || !a.number) return null;
+      var key = a.egris_egrid || ((a.identnd || a.ak || '') + '-' + a.number);
+      if (pcache[key]) return pcache[key];
+      var polys = !g ? [] : g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
+      polys = polys.map(function (poly) { return poly.map(function (ring) { return ring.map(function (c) { return [c[1], c[0]]; }); }); });
+      var bb = [90, 180, -90, -180];
+      polys.forEach(function (poly) { poly[0].forEach(function (c) { bb = [Math.min(bb[0], c[0]), Math.min(bb[1], c[1]), Math.max(bb[2], c[0]), Math.max(bb[3], c[1])]; }); });
+      var p = { key: key, nr: String(a.number), ak: a.ak || '', egrid: a.egris_egrid || '', polys: polys, bb: bb };
+      pcache[key] = p;
+      if (rec) resolvePending();
+      return p;
+    });
+  }
+  function showParcel(p, gps) {
+    parcelBox.innerHTML = '<span>Parzelle' + (gps ? '' : ' · Kartenmitte') + '</span><b>' + esc(p ? p.nr : '–') + '</b>' + (p && p.ak ? '<small>' + esc(p.ak) + '</small>' : '');
+    parcelBox.hidden = false;
+    $('tParcel').textContent = 'Parzelle ' + parcelName(p) + (gps ? '' : ' · Kartenmitte');
+  }
   function parcelQuery() {
     var gps = !!lastLL, ll = gps ? L.latLng(lastLL) : map.getCenter();
+    var known = parcelAt(ll.lat, ll.lng);
+    if (known) { if (gps) parcel.cur = known.key; showParcel(known, gps); return; }
     if (parcel.busy) return;
     if (parcel.ll && parcel.ll.distanceTo(ll) < 5 && Date.now() - parcel.t < 30000) return;
     parcel.busy = true; parcel.ll = ll; parcel.t = Date.now();
-    var url = 'https://api3.geo.admin.ch/rest/services/ech/MapServer/identify?geometryType=esriGeometryPoint&sr=4326&tolerance=0&returnGeometry=false&lang=de'
-      + '&layers=all:ch.kantone.cadastralwebmap-farbe&geometry=' + ll.lng.toFixed(7) + ',' + ll.lat.toFixed(7)
-      + '&mapExtent=' + [ll.lng - 0.001, ll.lat - 0.001, ll.lng + 0.001, ll.lat + 0.001].map(function (n) { return n.toFixed(7); }).join(',') + '&imageDisplay=100,100,96';
-    fetch(url).then(function (r) { return r.ok ? r.json() : Promise.reject(); }).then(function (j) {
-      var a = j.results && j.results[0] && j.results[0].attributes;
-      parcel.cur = gps && a && a.number ? (a.ak ? a.ak + ' ' : '') + a.number : null;
-      parcelBox.innerHTML = a && a.number
-        ? '<span>Parzelle' + (gps ? '' : ' · Kartenmitte') + '</span><b>' + String(a.number).replace(/[<>&]/g, '') + '</b>' + (a.ak ? '<small>' + String(a.ak).replace(/[<>&]/g, '') + '</small>' : '')
-        : '<span>Parzelle' + (gps ? '' : ' · Kartenmitte') + '</span><b>–</b>';
-      parcelBox.hidden = false;
-      $('tParcel').textContent = 'Parzelle ' + (a && a.number ? (a.ak ? a.ak + ' ' : '') + a.number : '–') + (gps ? '' : ' · Kartenmitte');
+    parcelFetch(ll.lat, ll.lng).then(function (p) {
+      if (gps) parcel.cur = p ? p.key : null;
+      showParcel(p, gps);
     }).catch(function () { parcel.ll = null; }).then(function () { parcel.busy = false; });
   }
   function parcelSoon() { clearTimeout(parcel.timer); parcel.timer = setTimeout(parcelQuery, 600); }
   map.on('moveend', function () { if (!lastLL) parcelSoon(); });
-  setInterval(function () { if (lastLL) parcelQuery(); }, 3000);
+  setInterval(function () { if (lastLL) parcelQuery(); }, 2000);
   parcelSoon();
+
+  // Streifen ohne bekannte Parzelle (z. B. Funkloch) nachträglich zuordnen, sobald ein Umriss da ist
+  function quadCenter(q) { return [(q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4]; }
+  function assignQuad(r, i) {
+    var c = quadCenter(r.quads[i]), p = parcelAt(c[0], c[1]);
+    if (!p) return false;
+    r.qP[i] = p.key;
+    if (!r.pGeo[p.key]) r.pGeo[p.key] = p;
+    return true;
+  }
+  function resolvePending() {
+    if (!rec) return;
+    for (var i = 0; i < rec.qP.length; i++) if (!rec.qP[i]) assignQuad(rec, i);
+  }
 
   var coverLayer = L.layerGroup().addTo(map);
   var trackLine = L.polyline([], { color: '#FFFFFF', weight: 2, opacity: 0.8, interactive: false }).addTo(map);
@@ -654,9 +765,9 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     }
     // Tempo-Ansicht (grosse Anzeige)
     $('ist').textContent = v === null || v <= STAND ? '–' : v.toFixed(1);
-    var turning = !!(rec && rec.turning), off = !!(rec && rec.spreadOff);
-    $('sollLine').textContent = (noSoll ? 'Soll – (kein Durchfluss)' : 'Soll ' + sollTxt + ' km/h · ±' + TOL) + (s.flow ? ' · aus Durchfluss' : '') + (turning ? ' · Wenden' : '') + (off ? ' · Ausbringen aus' : '');
-    // beim Wenden und bei «Ausbringen aus» wie auf der Karte kein Pfeil
+    var turning = !!(rec && rec.turning), off = !!(rec && rec.paused);
+    $('sollLine').textContent = (noSoll ? 'Soll – (kein Durchfluss)' : 'Soll ' + sollTxt + ' km/h · ±' + TOL) + (s.flow ? ' · aus Durchfluss' : '') + (turning ? ' · Wenden' : '') + (off ? ' · unterbrochen' : '');
+    // beim Wenden und während der Unterbrechung wie auf der Karte kein Pfeil
     var big = !!(st && st !== 'ok' && !turning && !off);
     $('arrow').hidden = !big;
     if (big) { $('arrowSvg').innerHTML = ARROW[st]; $('arrowTxt').textContent = { up: 'Schneller', down: 'Langsamer', stop: 'Stillstand' }[st]; }
@@ -687,7 +798,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (!standing) tractor.setRadius(7);
     // Ring nur bei laufender Aufzeichnung oder Tempo-Messung
     var dir = null, iv = 0;
-    if ((rec || tempoOnly) && !stale && !turning && !(rec && rec.spreadOff) && (st === 'up' || st === 'down')) {
+    if (((rec && !rec.paused) || tempoOnly) && !stale && !turning && (st === 'up' || st === 'down')) {
       if (ring.st !== st) { ring.st = st; ring.since = Date.now(); }
       if (Date.now() - ring.since >= RING_DELAY) {
         dir = st === 'down' ? 'in' : 'out';
@@ -835,8 +946,13 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     // Liter als Zunahmen aufsummieren: startet das Modul neu (Traktor abgestellt), beginnt sein Zähler
     // wieder bei 0 – dann zählt der neue Stand ab 0, statt die Menge zu verfälschen.
     // Unter 5 m³/h und beim Ausblasen (Luft) werden keine Liter gezählt.
+    // Während der Unterbrechung wird nichts gezählt. Die Liter warten in pendL, bis der nächste Streifen
+    // entsteht; so gehören sie zu dem Ort, an dem sie ausgebracht wurden.
     if (rec) {
-      if (rec.lastTotal !== null && flowActive()) { var d = total - rec.lastTotal; rec.liters += (d >= 0 ? d : total) * corr; }
+      if (!rec.paused && rec.lastTotal !== null && flowActive()) {
+        var d = total - rec.lastTotal, add = (d >= 0 ? d : total) * corr;
+        rec.liters += add; rec.pendL += add;
+      }
       rec.lastTotal = total; rec.flowSeen = true;
     }
     render();
@@ -861,7 +977,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
         });
       })
       .then(function () {
-        flow.connected = true; if (rec) rec.spreadOff = false;
+        flow.connected = true;
         var name = flow.device.name || 'Durchflussmesser';
         try { localStorage.setItem(STORE + '-sensor', name); } catch (e) {}   // zuletzt gewählter Sensor
         setFlowBtn(name + ' verbunden ✓'); showMsg(''); render();
@@ -946,11 +1062,14 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   };
   var rec = null, saved = null, watchId = null, demoTimer = null, wakeLock = null, follow = true, lastLL = null, lastFixAt = 0, samples = [], clockTimer = null;
 
+  // Eine Aufzeichnung = ein ganzer Einsatz (auch mit Verschlauchung über mehrere Parzellen).
+  // Pro Streifen (quad) gespeichert: Fläche qA (m²), Gülle qL (Liter, gemessen), Soll qR (m³/ha), Parzelle qP.
   function newRec() {
     var now = Date.now();
-    return { id: 'r' + now, origin: null, prevBoom: null, ref: null, quads: [], colors: [], track: [], trackDraw: [], cells: new Set(), sum: 0, parcels: {},
+    return { id: 'r' + now, origin: null, prevBoom: null, ref: null, quads: [], colors: [], track: [], trackDraw: [], cells: new Set(), sum: 0,
+      qA: [], qL: [], qR: [], qP: [], pGeo: {}, pendL: 0,
       start: now, segStart: now, msBefore: 0, end: null, liters: 0, lastTotal: null, flowSeen: false,
-      odo: 0, lastP: null, hist: [], curve: null, turning: false, turns: 0, spreadOff: false };
+      odo: 0, lastP: null, hist: [], curve: null, turning: false, turns: 0, paused: false, pauses: 0 };
   }
 
   // ---------- Wendemanöver erkennen ----------
@@ -1014,8 +1133,8 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (rec) {
       var area = rec.cells.size / 10000;
       var measured = rec.flowSeen ? rec.liters / 1000 : null;
-      // Dauer ohne die Zeit zwischen Stopp und Fortsetzen
-      var ms = rec.msBefore + (rec.end || Date.now()) - rec.segStart;
+      // Arbeitsdauer ohne die Unterbrechungen
+      var ms = rec.msBefore + (rec.segStart ? (rec.end || Date.now()) - rec.segStart : 0);
       return { area: area, overlap: rec.sum > 0 ? Math.max(0, rec.sum - rec.cells.size) / rec.sum * 100 : 0, ms: ms, measured: measured, turns: rec.turns };
     }
     if (saved) return saved.stats;
@@ -1051,7 +1170,20 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       $('sMeasured').innerHTML = (st.measured !== null && st.measured !== undefined ? st.measured.toFixed(1) : '0.0') + '<small>m³</small>';
     }
   }
-  function setStatus(text, recording) { $('status').innerHTML = '<span class="rec-dot"></span>' + text; $('statusBar').className = 'status' + (recording ? ' rec' : ''); }
+  function setStatus(text, recording, cls) { $('status').innerHTML = '<span class="rec-dot"></span>' + esc(text); $('statusBar').className = 'status' + (recording ? ' rec' : '') + (cls ? ' ' + cls : ''); }
+  // Statuszeile je nach Zustand: Bereit · Aufzeichnung läuft · Unterbrochen (mit Warnung, wenn trotzdem Gülle fliesst)
+  var lastAcc = '';
+  function showRecStatus() {
+    if (Date.now() < statusHoldUntil || demoTimer) return;   // ein Hinweis bleibt kurz stehen
+    var gps = lastAcc ? ' · GPS ' + lastAcc : '';
+    if (!rec) { setStatus((lastLL ? 'Bereit' : 'GPS sucht …') + gps, false); return; }
+    if (rec.paused) {
+      if (flowActive()) setStatus('Unterbrochen – aber Gülle fliesst! «Weiter aufzeichnen» drücken', false, 'warn');
+      else setStatus('Unterbrochen · es wird nichts aufgezeichnet', false, 'paused');
+      return;
+    }
+    setStatus('Aufzeichnung läuft' + gps + (rec.turning ? ' · Wenden' : '') + (rec.turns ? ' · ' + rec.turns + '× gewendet' : ''), true);
+  }
   // kind 'gps': verschwindet von selbst, sobald wieder eine Position kommt, und schliesst das Menü nicht
   var msgKind = null;
   function showMsg(t, kind) {
@@ -1128,11 +1260,12 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (!map.hasLayer(tractor)) tractor.addTo(map);
     if (kmh !== null) { samples.push({ v: kmh, t: t }); samples = samples.filter(function (s) { return t - s.t <= WINDOW_MS; }); }
     rotFeed(lat, lon, kmh, headingDeg);
-    if (acc !== null && Date.now() > statusHoldUntil) {   // ein Hinweis bleibt kurz stehen
-      var accTxt = acc < 1 ? '±' + Math.max(1, Math.round(acc * 100)) + ' cm' + (acc <= 0.1 ? ' · RTK' : '') : '±' + Math.round(acc) + ' m' + (acc > 20 ? ' (schwach)' : '');
-      $('status').innerHTML = '<span class="rec-dot"></span>' + (rec ? 'Aufzeichnung' : 'GPS') + ' · ' + accTxt + (rec && rec.spreadOff ? ' · Ausbringen aus' : '') + (rec && rec.turning ? ' · Wenden' : '') + (rec && rec.turns ? ' · ' + rec.turns + '× gewendet' : '');
+    if (acc !== null) {
+      lastAcc = acc < 1 ? '±' + Math.max(1, Math.round(acc * 100)) + ' cm' + (acc <= 0.1 ? ' · RTK' : '') : '±' + Math.round(acc) + ' m' + (acc > 20 ? ' (schwach)' : '');
+      showRecStatus();
     }
-    if (!rec) { moveTo(L.latLng(lastLL)); render(); return; }
+    // vor dem Start und während der Unterbrechung: nur die aktuelle Position (gelber Punkt), keine Spur
+    if (!rec || rec.paused) { moveTo(L.latLng(lastLL)); render(); return; }
 
     if (!rec.origin) rec.origin = { lat: lat, lon: lon };
     var raw = toXY(rec.origin, lat, lon);
@@ -1155,8 +1288,6 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 
     var v = speedAvg();
     if (v === null || v <= STAND || h === null) { rec.prevBoom = null; boomTo(null); render(); return; }
-    // «Ausbringen aus» (z. B. Fahrt zur Güllegrube): nichts einfärben
-    if (rec.spreadOff) { rec.prevBoom = null; boomTo(null); render(); return; }
     // mit Durchflussmesser: nur einfärben, wenn tatsächlich Gülle fliesst
     if (flow.connected && !flowActive()) { rec.prevBoom = null; boomTo(null); render(); return; }
     // ohne Durchflussmesser: beim Wenden nicht einfärben (abschaltbar)
@@ -1180,12 +1311,14 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (rec.prevBoom && dist(rec.prevBoom.c, c) < MAX_JUMP) {
       var q = [rec.prevBoom.l, rec.prevBoom.r, br, bl];
       var ll = q.map(function (pt) { return toLL(rec.origin, pt); });
-      var col = rateColor();
+      var col = rateColor(), a = shoelace(q);
       rec.quads.push(ll); rec.colors.push(col);
       L.polygon(ll, coverStyle(col)).addTo(coverLayer);
-      rec.sum += shoelace(q);
-      // befahrene Fläche pro Parzelle (Nummer an der Traktor-Position, inkl. Überlappung)
-      if (parcel.cur) rec.parcels[parcel.cur] = (rec.parcels[parcel.cur] || 0) + shoelace(q);
+      rec.sum += a;
+      // Streifen merken: Fläche, Gülle seit dem letzten Streifen, Soll und Parzelle (nach Lage der Streifen-Mitte)
+      rec.qA.push(a); rec.qL.push(rec.flowSeen ? rec.pendL : null); rec.qR.push(cfg.rate); rec.qP.push(null);
+      rec.pendL = 0;
+      assignQuad(rec, rec.quads.length - 1);
       rasterize(rec, q);
     }
     rec.prevBoom = { l: bl, r: br, c: c };
@@ -1199,7 +1332,8 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   }
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && (rec || tempoOnly)) keepAwake(); });
 
-  // ---------- GPS: läuft während der Aufzeichnung oder bei «Nur Tempo messen» ----------
+  // ---------- GPS: läuft, solange die App offen ist (gelber Punkt = aktuelle Position) ----------
+  // Aufgezeichnet wird erst nach «Aufzeichnung starten». «Nur Tempo messen» schaltet zusätzlich den Ring ein.
   var tempoOnly = false;
   function gpsCheck() {
     if (!('geolocation' in navigator)) { showMsg('Dieses Gerät bietet kein GPS im Browser an.'); return false; }
@@ -1229,11 +1363,10 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   function setTempoOnly(on) {
     tempoOnly = on;
     $('gpsOnly').firstElementChild.textContent = on ? 'Tempo-Messung stoppen' : 'Nur Tempo messen (ohne Aufzeichnung)';
-    if (on) { startGps(); keepAwake(); setStatus('GPS sucht …', false); return; }
+    if (on) { startGps(); keepAwake(); showRecStatus(); return; }
     if (rec) return;
-    stopGps(); samples = [];
     if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
-    setStatus('Bereit', false);
+    showRecStatus();
     render();
   }
   $('gpsOnly').addEventListener('click', function () {
@@ -1244,16 +1377,21 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 
   // ---------- Speichern: beim Stoppen, alle 30 s während der Aufzeichnung und wenn die App in den Hintergrund geht ----------
   // So geht bei einem Absturz, Anruf oder leerem Akku höchstens eine halbe Minute verloren.
-  var AUTOSAVE_MS = 30000, autosaveTimer = null, autosaveWarned = false, demoBackup = null;
+  var AUTOSAVE_MS = 30000, autosaveTimer = null, autosaveWarned = false;
   function snapshot(open) {
     var st = stats(); st.rate = cfg.rate;
-    return { id: rec.id, open: open, quads: rec.quads, colors: rec.colors, track: rec.track, trackDraw: rec.trackDraw, parcels: rec.parcels,
-      origin: rec.origin, sum: rec.sum, turns: rec.turns, liters: rec.liters, flowSeen: rec.flowSeen, msTotal: st.ms, start: rec.start,
+    // nur die Umrisse der Parzellen mitspeichern, auf denen tatsächlich gefahren wurde
+    var pGeo = {};
+    rec.qP.forEach(function (k) { if (k && rec.pGeo[k]) pGeo[k] = rec.pGeo[k]; });
+    return { id: rec.id, open: open, paused: rec.paused, pauses: rec.pauses, quads: rec.quads, colors: rec.colors, track: rec.track, trackDraw: rec.trackDraw,
+      qA: rec.qA, qL: rec.qL, qR: rec.qR, qP: rec.qP, pGeo: pGeo, pendL: rec.pendL,
+      origin: rec.origin, sum: rec.sum, turns: rec.turns, liters: rec.liters, flowSeen: rec.flowSeen, msTotal: st.ms, start: rec.start, end: rec.end,
+      sensor: flow.device && flow.device.name || null,
       stats: st, cfg: JSON.parse(JSON.stringify(cfg)), date: new Date(rec.start).toISOString() };
   }
   function persist(obj) { try { localStorage.setItem(STORE, JSON.stringify(obj)); return true; } catch (e) { return false; } }
   function autosave() {
-    if (!rec || demoTimer || !rec.quads.length) return;
+    if (!rec || demoTimer || (!rec.quads.length && !rec.track.length)) return;
     var s = snapshot(true), lsOk = persist(s);
     dbPut(s).catch(function () {});
     if (!lsOk && !dbOk && !autosaveWarned) {
@@ -1264,11 +1402,16 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') autosave(); });
   window.addEventListener('pagehide', autosave);
 
-  // gespeicherte Karte wieder zu einer laufenden Aufzeichnung machen (Fortsetzen)
+  // nicht abgeschlossene Aufzeichnung (App geschlossen, Absturz, Akku leer) wieder aufnehmen – unterbrochen
   function restoreRec(s) {
     var r = newRec();
     r.quads = s.quads || []; r.colors = s.colors || []; r.track = s.track || [];
-    r.trackDraw = normTrack(s.trackDraw || s.track); r.parcels = s.parcels || {};
+    r.trackDraw = normTrack(s.trackDraw || s.track);
+    var n = r.quads.length;
+    r.qA = s.qA || []; r.qL = s.qL || []; r.qR = s.qR || []; r.qP = s.qP || []; r.pGeo = s.pGeo || {};
+    for (var i = r.qP.length; i < n; i++) { r.qA.push(null); r.qL.push(null); r.qR.push((s.cfg && s.cfg.rate) || cfg.rate); r.qP.push(null); }
+    Object.keys(r.pGeo).forEach(function (k) { if (!pcache[k]) pcache[k] = r.pGeo[k]; });
+    r.pendL = s.pendL || 0; r.pauses = s.pauses || 0;
     r.origin = s.origin || (r.quads.length ? { lat: r.quads[0][0][0], lon: r.quads[0][0][1] } : null);
     r.turns = s.turns || (s.stats && s.stats.turns) || 0;
     r.flowSeen = !!(s.flowSeen || (s.stats && s.stats.measured !== null && s.stats.measured !== undefined));
@@ -1276,25 +1419,36 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     r.start = s.start || Date.parse(s.date) || Date.now();
     r.id = s.id || 'r' + r.start;
     r.msBefore = typeof s.msTotal === 'number' ? s.msTotal : (s.stats && s.stats.ms) || 0;
-    r.segStart = Date.now();
+    r.paused = true; r.segStart = null;                 // weiter erst mit «Weiter aufzeichnen»
+    if (r.track.length && r.track[r.track.length - 1] !== null) r.track.push(null);   // Spur hier trennen
     // Fläche und Überlappung aus den Streifen neu berechnen
-    if (r.origin) r.quads.forEach(function (q) {
+    if (r.origin) r.quads.forEach(function (q, i) {
       var xy = q.map(function (pt) { return toXY(r.origin, pt[0], pt[1]); });
       if (typeof s.sum !== 'number') r.sum += shoelace(xy);
+      if (r.qA[i] === null || r.qA[i] === undefined) r.qA[i] = shoelace(xy);
       rasterize(r, xy);
     });
     if (typeof s.sum === 'number') r.sum = s.sum;
+    for (i = 0; i < n; i++) if (!r.qP[i]) assignQuad(r, i);
     return r;
   }
+  // Fahrspur: Unterbrechungen sind als null gespeichert -> einzelne Abschnitte
+  function trackSegs(t) {
+    var segs = [[]];
+    (t || []).forEach(function (p) { if (p) segs[segs.length - 1].push(p); else if (segs[segs.length - 1].length) segs.push([]); });
+    return segs.filter(function (s) { return s.length > 1; });
+  }
+  function trackPts(t) { return (t || []).filter(Boolean); }
   function drawSaved(s, fit) {
     coverLayer.clearLayers();
     s.quads.forEach(function (q, i) { L.polygon(q, coverStyle(s.colors && s.colors[i])).addTo(coverLayer); });
-    trackLine.setLatLngs(normTrack(s.trackDraw || s.track));
-    if (fit && s.track && s.track.length) { map.fitBounds(L.latLngBounds(s.track), { padding: [20, 20] }); follow = false; }
+    trackLine.setLatLngs(normTrack(s.trackDraw || trackSegs(s.track)));
+    var pts = trackPts(s.track);
+    if (fit && pts.length) { map.fitBounds(L.latLngBounds(pts), { padding: [20, 20] }); follow = false; }
   }
 
   // ---------- Liste der Aufzeichnungen (IndexedDB – viel mehr Platz als die 5 MB von localStorage) ----------
-  // Jedes Fass = eine Aufzeichnung. localStorage hält nur die aktuelle bzw. zuletzt angezeigte (für «Fortsetzen»).
+  // Eine Aufzeichnung = ein ganzer Einsatz. localStorage hält nur die laufende (für den Neustart nach Absturz).
   var dbP = null, dbOk = false;
   function db() {
     if (dbP) return dbP;
@@ -1327,9 +1481,9 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     return d.toLocaleDateString('de-CH', { weekday: 'short', day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
   }
   function recMeta(s) {
-    var st = s.stats || {}, pl = parcelList(s).map(function (x) { return x.nr; });
-    var m3 = st.measured !== null && st.measured !== undefined ? st.measured.toFixed(1) + ' m³ gemessen' : Math.round((st.area || 0) * (st.rate || (s.cfg && s.cfg.rate) || 0)) + ' m³ berechnet';
-    return (pl.length ? 'Parzelle ' + pl.join(', ') + ' · ' : '') + (st.area || 0).toFixed(2) + ' ha · ' + m3 + ' · ' + mmss(st.ms || 0);
+    var sm = s.summary || summarize(s);
+    var pl = sm.parcels.filter(function (p) { return p.key !== '?'; }).map(function (p) { return p.nr; });
+    return (pl.length ? 'Parzelle ' + pl.join(', ') + ' · ' : '') + sm.ha.toFixed(2) + ' ha · ' + sm.m3.toFixed(1) + ' m³ ' + (sm.measured ? 'gemessen' : 'berechnet') + ' · ' + mmss((s.stats && s.stats.ms) || 0);
   }
   function renderRecList() {
     dbAll().then(function (all) {
@@ -1339,10 +1493,10 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       box.innerHTML = all.map(function (s) {
         var running = rec && rec.id === s.id;
         return '<div class="rec-item' + (s.id === curId ? ' cur' : '') + '" data-id="' + esc(s.id) + '">' +
-          '<div><b>' + esc(recTitle(s)) + '</b>' + (running ? '<span class="tag">läuft</span>' : s.open ? '<span class="tag">unterbrochen</span>' : '') +
+          '<div><b>' + esc(recTitle(s)) + '</b>' + (running ? '<span class="tag">' + (rec.paused ? 'unterbrochen' : 'läuft') + '</span>' : s.open ? '<span class="tag">nicht abgeschlossen</span>' : '') +
           '<div class="meta">' + esc(recMeta(s)) + '</div></div>' +
-          '<div class="rec-btns"><button type="button" data-act="show">Zeigen</button><button type="button" data-act="kml">KML</button>' +
-          '<button type="button" data-act="geo">GeoJSON</button><button type="button" data-act="del">Löschen</button></div></div>';
+          '<div class="rec-btns"><button type="button" data-act="rep">Bericht</button><button type="button" data-act="show">Karte</button>' +
+          '<button type="button" data-act="kml">KML</button><button type="button" data-act="geo">GeoJSON</button><button type="button" data-act="del">Löschen</button></div></div>';
       }).join('');
     }).catch(function () { $('recList').innerHTML = '<p class="note">Liste auf diesem Gerät nicht verfügbar.</p>'; });
   }
@@ -1351,126 +1505,131 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     var id = b.closest('.rec-item').getAttribute('data-id'), act = b.getAttribute('data-act');
     dbAll().then(function (all) {
       var s = all.filter(function (x) { return x.id === id; })[0]; if (!s) return;
-      if (act === 'kml') { exportKml(s); return; }
-      if (act === 'geo') { exportGeo(s); return; }
-      if (rec) { showMsg(act === 'del' && rec.id === id ? 'Diese Aufzeichnung läuft noch – zuerst stoppen.' : 'Während einer Aufzeichnung kann keine andere angezeigt oder gelöscht werden.'); return; }
+      var running = rec && rec.id === id;
+      if (act === 'kml') { exportKml(running ? snapshot(true) : s); return; }
+      if (act === 'geo') { exportGeo(running ? snapshot(true) : s); return; }
+      if (act === 'rep') {
+        if (running) { showMsg('Diese Aufzeichnung läuft noch – der Bericht entsteht mit «Abschliessen».'); return; }
+        closeMenu(); openReport(s, false); return;
+      }
+      if (rec) { showMsg(act === 'del' && running ? 'Diese Aufzeichnung läuft noch – zuerst abschliessen.' : 'Während einer Aufzeichnung kann keine andere angezeigt oder gelöscht werden.'); return; }
       if (act === 'show') {
-        saved = s; persist(s); drawSaved(s, true);
-        setStatus('Aufzeichnung vom ' + recTitle(s), false);
+        saved = s; drawSaved(s, true);
+        setStatus('Karte vom ' + recTitle(s) + ' (nur Anzeige)', false); statusHoldUntil = Date.now() + 6000;
         updateActions(); render(); closeMenu();
       }
       if (act === 'del' && confirm('Aufzeichnung vom ' + recTitle(s) + ' löschen?\nDas kann nicht rückgängig gemacht werden.')) {
         dbDel(id).then(function () {
-          if (saved && saved.id === id) {
-            saved = null; coverLayer.clearLayers(); trackLine.setLatLngs([]);
-            try { localStorage.removeItem(STORE); } catch (err) {}
-            setStatus('Bereit', false); updateActions(); render();
-          }
+          if (saved && saved.id === id) { saved = null; coverLayer.clearLayers(); trackLine.setLatLngs([]); updateActions(); render(); }
           renderRecList();
         });
       }
     });
   });
 
-  // ---------- Tasten unten: Ausbringen ein/aus · Fortsetzen · Start/Stopp ----------
+  // ---------- Tasten unten: Aufzeichnung starten · Unterbrechen / Weiter aufzeichnen · Abschliessen ----------
   function setLabel(el, t) { if (el.firstElementChild.textContent !== t) el.firstElementChild.textContent = t; }
   function updateActions() {
-    var recording = !!rec, canResume = !rec && !!saved && !demoTimer;
-    var showSpread = recording && (!flow.connected || !!flow.fake);   // mit Durchflussmesser entscheidet der Durchfluss
-    $('spreadBtn').hidden = !showSpread;
-    if (showSpread) {
-      $('spreadBtn').setAttribute('aria-pressed', String(!rec.spreadOff));
-      setLabel($('spreadBtn'), rec.spreadOff ? 'Ausbringen aus' : 'Ausbringen ein');
-    }
-    $('resumeBtn').hidden = !canResume;
+    var recording = !!rec, paused = recording && rec.paused, demo = !!demoTimer;
+    var pb = $('pauseBtn');
+    pb.hidden = !recording || demo;
+    setLabel(pb, paused ? 'Weiter aufzeichnen' : 'Unterbrechen');
+    pb.classList.toggle('line', !paused);          // unterbrochen: «Weiter aufzeichnen» gelb hervorgehoben
     var ss = $('startStop');
     ss.classList.toggle('stop', recording);
-    ss.classList.toggle('line', !recording && canResume);
-    setLabel(ss, recording ? (demoTimer ? 'Demo stoppen · halten' : 'Stopp · halten') : canResume ? 'Neues Fass' : 'Aufzeichnung starten');
-    $('actions').classList.toggle('two', showSpread || canResume);
+    setLabel(ss, recording ? (demo ? 'Demo stoppen · halten' : 'Abschliessen · halten') : 'Aufzeichnung starten');
+    $('actions').classList.toggle('two', recording && !demo);
   }
-  $('spreadBtn').addEventListener('click', function () {
-    if (!rec) return;
-    rec.spreadOff = !rec.spreadOff;
-    updateActions(); render();
-  });
+  $('pauseBtn').addEventListener('click', function () { if (!rec) return; if (rec.paused) continueRec(); else pauseRec(); });
 
   function startRecUI() {
     keepAwake();
     clearInterval(clockTimer); clockTimer = setInterval(render, 1000);
     clearInterval(autosaveTimer); autosaveTimer = setInterval(autosave, AUTOSAVE_MS);
     $('gpsOnly').hidden = true;
-    setStatus('Aufzeichnung', true);
     follow = true;
-    updateActions();
+    updateActions(); showRecStatus();
+  }
+  // Gülle seit dem letzten Streifen dem letzten Streifen zurechnen (vor Unterbrechen und Abschliessen)
+  function flushPend(r) {
+    if (r.pendL > 0 && r.qL.length && r.qL[r.qL.length - 1] !== null) { r.qL[r.qL.length - 1] += r.pendL; r.pendL = 0; }
   }
   function begin(isDemo) {
-    if (!isDemo && saved) {
-      // die bisherige Aufzeichnung bleibt in der Liste (ohne Liste: wie früher nachfragen)
-      if (dbOk) { if (saved.open) saved.open = false; dbPut(saved).catch(function () {}); }
-      else if (!confirm('Die gespeicherte Karte wird ersetzt. Neue Aufzeichnung starten?\n\nTipp: «Fortsetzen» macht auf der bestehenden Karte weiter.')) return false;
-    }
-    if (isDemo) demoBackup = saved;          // echte Karte während der Demo aufbewahren
     coverLayer.clearLayers(); trackLine.setLatLngs([]); boomTo(null);
-    saved = null; samples = [];
+    saved = null;
     rec = newRec();
     rec.lastTotal = flow.total;              // Liter erst ab jetzt zählen
     startRecUI();
+    if (!isDemo) persist(snapshot(true));
     return true;
   }
-  function resume() {
-    if (!saved || rec || !gpsCheck()) return;
-    var keep = tempoOnly ? samples : null;
-    rec = restoreRec(saved);
-    rec.lastTotal = flow.total;              // was zwischen Stopp und Fortsetzen floss, nicht mitzählen
-    saved = null; samples = keep || [];
-    startRecUI();
-    persist(snapshot(true));
-    showMsg('');
-    setStatus('GPS sucht …', true);
-    startGps();
+  // Unterbrechen: Position wird weiter angezeigt, aber nichts aufgezeichnet (keine Spur, keine Fläche, keine Gülle)
+  function pauseRec() {
+    if (!rec || rec.paused) return;
+    statusHoldUntil = 0;
+    rec.paused = true; rec.pauses++;
+    rec.msBefore += Date.now() - rec.segStart; rec.segStart = null;
+    flushPend(rec);
+    // Spur hier beenden – nach «Weiter aufzeichnen» beginnt ein neuer Abschnitt ohne Verbindungslinie
+    var seg = rec.trackDraw[rec.trackDraw.length - 1];
+    if (seg && seg.length && rec.sp) { seg.push(toLL(rec.origin, rec.sp)); trackLine.setLatLngs(rec.trackDraw); }
+    if (rec.track.length && rec.track[rec.track.length - 1] !== null) rec.track.push(null);
+    rec.spl = null; rec.splLast = null; rec.sp = null; rec.prevBoom = null;
+    rec.lastP = null; rec.curve = null; rec.turning = false; rec.hist = [];
+    boomTo(null);
+    autosave();
+    updateActions(); showRecStatus(); render();
   }
-  $('resumeBtn').addEventListener('click', resume);
+  function continueRec() {
+    if (!rec || !rec.paused) return;
+    statusHoldUntil = 0;
+    rec.paused = false; rec.segStart = Date.now();
+    rec.lastTotal = flow.total;              // was während der Unterbrechung floss, nicht mitzählen
+    follow = true; keepAwake(); showMsg('');
+    if (!autosaveTimer) startRecUI();
+    persist(snapshot(true));
+    updateActions(); showRecStatus(); render();
+  }
 
+  // Abschliessen: speichern und den Bericht zeigen
   function finish() {
-    var wasDemo = !!demoTimer, stored = true;
+    var wasDemo = !!demoTimer, snap = null;
     if (demoTimer) { clearInterval(demoTimer); demoTimer = null; }
-    if (!tempoOnly || wasDemo) stopGps();
     clearInterval(clockTimer); clockTimer = null;
     clearInterval(autosaveTimer); autosaveTimer = null;
     if (wakeLock && !tempoOnly) { wakeLock.release().catch(function () {}); wakeLock = null; }
     if (rec) {
+      if (!rec.paused) {
+        rec.msBefore += Date.now() - rec.segStart; rec.segStart = null;
+        var seg = rec.trackDraw[rec.trackDraw.length - 1];   // Spur bis zum letzten Punkt abschliessen
+        if (seg && rec.sp) { seg.push(toLL(rec.origin, rec.sp)); trackLine.setLatLngs(rec.trackDraw); }
+      }
       rec.end = Date.now();
-      // angezeigte Spline-Spur bis zum letzten Punkt abschliessen
-      var seg = rec.trackDraw[rec.trackDraw.length - 1];
-      if (seg && rec.sp) { seg.push(toLL(rec.origin, rec.sp)); trackLine.setLatLngs(rec.trackDraw); }
-      var snap = snapshot(false);
+      flushPend(rec);
+      snap = snapshot(false);
+      snap.summary = summarize(snap);
       rec = null;
-      if (wasDemo) {
-        // Demo: nichts speichern, die echte Karte wieder anzeigen
-        saved = demoBackup; demoBackup = null;
-        coverLayer.clearLayers(); trackLine.setLatLngs([]);
-        if (saved) drawSaved(saved, false);
-      } else if (snap.quads.length || snap.track.length) {
-        // in die Liste (IndexedDB) und als aktuelle Karte (localStorage, für «Fortsetzen»)
-        saved = snap;
-        var lsOk = persist(snap), noSave = 'Karte konnte auf diesem Gerät nicht gespeichert werden. Bitte herunterladen.';
-        stored = lsOk || dbOk;
-        dbPut(snap).catch(function () { if (!lsOk) showMsg(noSave); });
-        if (!stored) showMsg(noSave);
+      if (!wasDemo) {
+        try { localStorage.removeItem(STORE); } catch (e) {}   // keine offene Aufzeichnung mehr
+        var noSave = 'Aufzeichnung konnte auf diesem Gerät nicht gespeichert werden – bitte im Bericht als PDF oder KML sichern.';
+        if (dbOk) dbPut(snap).catch(function () { showMsg(noSave); }); else showMsg(noSave);
       }
     }
     boomTo(null);
-    if (!tempoOnly) samples = [];
     $('gpsOnly').hidden = false;
     $('demo').firstElementChild.textContent = 'Demo ohne GPS';
-    setStatus(wasDemo ? 'Demo beendet' : stored === false ? 'Gestoppt · nicht gespeichert' : 'Gestoppt · gespeichert', false);
     if (flow.fake) flow = newFlow();
-    updateActions();
-    render();
+    if (wasDemo) {
+      // Demo-Position vergessen, echtes GPS wieder einschalten
+      lastLL = null; lastAcc = ''; disp.ll = disp.from = disp.to = disp.prev = null; tractor.remove();
+      startGps();
+    }
+    updateActions(); showRecStatus(); render();
+    if (snap && (snap.quads.length || trackPts(snap.track).length)) openReport(snap, true, wasDemo);
+    else { coverLayer.clearLayers(); trackLine.setLatLngs([]); }
   }
 
-  // Stoppen nur mit 1 s gedrückt halten – ein Holpern auf dem Feld beendet die Aufzeichnung nicht
+  // Abschliessen nur mit 1 s gedrückt halten – ein Holpern auf dem Feld beendet die Aufzeichnung nicht
   var HOLD_MS = 1000, holdTimer = null, holdDone = false, statusHoldUntil = 0;
   function holdCancel() {
     if (!holdTimer) return;
@@ -1478,6 +1637,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     $('startStop').classList.remove('holding');
   }
   $('startStop').addEventListener('pointerdown', function () {
+    holdDone = false;                                      // neuer Tastendruck: altes «gehalten» vergessen
     if (!rec) return;
     $('startStop').classList.add('holding');
     holdTimer = setTimeout(function () { holdTimer = null; holdDone = true; $('startStop').classList.remove('holding'); finish(); }, HOLD_MS);
@@ -1488,17 +1648,14 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (holdDone) { holdDone = false; return; }            // Klick nach dem Halten nicht als «Neu starten» werten
     if (rec) {
       // Tastatur (kein Zeiger): mit Rückfrage; Finger: Hinweis aufs Halten
-      if (e.detail === 0) { if (confirm('Aufzeichnung stoppen?')) finish(); }
-      else { setStatus('Zum Stoppen 1 Sekunde gedrückt halten', true); statusHoldUntil = Date.now() + 2500; }
+      if (e.detail === 0) { if (confirm('Aufzeichnung abschliessen?')) finish(); }
+      else { statusHoldUntil = 0; setStatus('Zum Abschliessen 1 Sekunde gedrückt halten', !rec.paused); statusHoldUntil = Date.now() + 2500; }
       return;
     }
     if (!gpsCheck()) return;
-    var keep = tempoOnly ? samples : null;
-    if (!begin()) return;
-    if (keep) samples = keep;   // laufende Tempo-Messung weiterverwenden
-    showMsg('');
-    setStatus('GPS sucht …', true);
     startGps();
+    begin();
+    showMsg('');
   });
   var lastFix = null;
   function toDistM(a, c) { var o = { lat: a.lat, lon: a.lon }; var p = toXY(o, c.latitude, c.longitude); return Math.hypot(p.x, p.y); }
@@ -1506,8 +1663,9 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   // ---------- Demo: Hin- und Herfahren auf einer Wiese ----------
   $('demo').addEventListener('click', function () {
     if (demoTimer) { finish(); return; }
-    if (rec) { showMsg('Die Demo geht erst, wenn die Aufzeichnung gestoppt ist.'); return; }
+    if (rec) { showMsg('Die Demo geht erst, wenn die Aufzeichnung abgeschlossen ist.'); return; }
     if (tempoOnly) setTempoOnly(false);
+    stopGps();                               // echte Positionen während der Demo nicht einmischen
     // ohne echten Durchflussmesser: Durchfluss simulieren (Bahn 2 zu wenig, Bahn 4 zu viel)
     var simFlow = !flow.connected;
     if (simFlow) flow = newFlow({ connected: true, fake: true, lmin: 0, total: 0, t: Date.now() });
@@ -1558,10 +1716,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     render();
   });
 
-  function current() {
-    if (rec) return { quads: rec.quads, colors: rec.colors, track: rec.track, parcels: rec.parcels, stats: stats(), cfg: cfg, date: new Date(rec.start).toISOString() };
-    return saved;
-  }
+  function current() { return rec ? snapshot(true) : saved; }
   function download(name, type, text) {
     var blob = new Blob([text], { type: type });
     var a = document.createElement('a');
@@ -1571,52 +1726,211 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   }
   // Dateiname mit Schweizer Ortszeit (nicht UTC)
   function fileBase(d) {
-    var t = new Date(d.date), p = function (n) { return String(n).padStart(2, '0'); };
-    return 'guelle-karte-' + t.getFullYear() + '-' + p(t.getMonth() + 1) + '-' + p(t.getDate()) + '-' + p(t.getHours()) + '-' + p(t.getMinutes());
+    var t = new Date(d.start || d.date), p = function (n) { return String(n).padStart(2, '0'); };
+    return 'guelle-' + t.getFullYear() + '-' + p(t.getMonth() + 1) + '-' + p(t.getDate()) + '-' + p(t.getHours()) + '-' + p(t.getMinutes());
   }
-  function props(d) {
-    var measured = d.stats.measured !== null && d.stats.measured !== undefined;
-    return { datum: d.date, flaeche_ha: Number(d.stats.area.toFixed(3)), menge_m3: measured ? Number(d.stats.measured.toFixed(1)) : Math.round(d.stats.area * (d.stats.rate || d.cfg.rate)), menge_quelle: measured ? 'Durchflussmesser' : 'berechnet', ueberlappung_prozent: Math.round(d.stats.overlap), arbeitsbreite_m: d.cfg.width, positionsquelle: d.cfg.source === 'antenna' ? 'Antenne' : 'Handy', abstand_verteiler_m: d.cfg.source === 'antenna' ? d.cfg.aOffset : d.cfg.offset, seitlicher_versatz_m: d.cfg.source === 'antenna' ? d.cfg.aSide : 0, ausbringmenge_m3_ha: d.cfg.rate, wendemanoever: d.stats.turns || 0, durchfluss_korrektur_prozent: d.cfg.flowCorr || 0, parzellen: parcelList(d).map(function (x) { return x.nr; }).join(', ') };
+  function esc(s) { return String(s).replace(/[<>&"]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]; }); }
+
+  // ---------- Auswertung: wie viel Gülle auf welcher Parzelle ----------
+  // Fläche netto über ein 1-m-Raster (Überlappung nur einmal, die Zelle gehört der Parzelle des ersten Streifens).
+  // Gülle pro Streifen: gemessen (Durchflussmesser) oder Fläche × Soll. Ältere Aufzeichnungen ohne Liter pro
+  // Streifen: gemessene Gesamtmenge nach Fläche verteilt.
+  function summarize(d) {
+    var quads = d.quads || [], o = d.origin || (quads.length ? { lat: quads[0][0][0], lon: quads[0][0][1] } : null);
+    var measured = !!d.flowSeen, rate = (d.cfg && d.cfg.rate) || 0, qL = d.qL || [];
+    var xys = quads.map(function (q) { return q.map(function (pt) { return toXY(o, pt[0], pt[1]); }); });
+    var areas = xys.map(function (xy, i) { return d.qA && typeof d.qA[i] === 'number' ? d.qA[i] : shoelace(xy); });
+    var totA = areas.reduce(function (s, a) { return s + a; }, 0);
+    var perQuad = measured && qL.some(function (x) { return typeof x === 'number'; });
+    var by = {}, owner = new Map();
+    function entry(k) { return by[k] || (by[k] = { key: k, cells: 0, L: 0 }); }
+    xys.forEach(function (q, i) {
+      var e = entry((d.qP && d.qP[i]) || '?');
+      e.L += measured ? (perQuad ? (qL[i] || 0) : (totA ? (d.liters || 0) * areas[i] / totA : 0))
+                      : areas[i] / 10000 * ((d.qR && d.qR[i]) || rate) * 1000;
+      var minX = Math.floor(Math.min(q[0].x, q[1].x, q[2].x, q[3].x)), maxX = Math.ceil(Math.max(q[0].x, q[1].x, q[2].x, q[3].x));
+      var minY = Math.floor(Math.min(q[0].y, q[1].y, q[2].y, q[3].y)), maxY = Math.ceil(Math.max(q[0].y, q[1].y, q[2].y, q[3].y));
+      for (var x = minX; x < maxX; x += CELL) for (var y = minY; y < maxY; y += CELL) {
+        var c = x + ',' + y;
+        if (!owner.has(c) && inQuad(q, x + 0.5, y + 0.5)) { owner.set(c, e.key); e.cells++; }
+      }
+    });
+    // gemessene Gülle ohne Streifen (z. B. nur im Stand gepumpt): «ohne Zuordnung»
+    if (measured) {
+      var got = Object.keys(by).reduce(function (s, k) { return s + by[k].L; }, 0);
+      if ((d.liters || 0) - got > 50) entry('?').L += d.liters - got;
+    }
+    var parcels = Object.keys(by).map(function (k) {
+      var e = by[k], g = d.pGeo && d.pGeo[k], ha = e.cells / 10000, m3 = e.L / 1000;
+      return { key: k, nr: g ? g.nr : 'ohne Zuordnung', ak: g ? g.ak : '', egrid: g ? g.egrid : '', ha: ha, m3: m3, rate: ha > 0.0005 ? m3 / ha : null };
+    }).sort(function (a, b) { return (a.key === '?') - (b.key === '?') || b.m3 - a.m3; });
+    var ha = owner.size / 10000, m3 = parcels.reduce(function (s, p) { return s + p.m3; }, 0);
+    return { parcels: parcels, ha: ha, m3: m3, rate: ha > 0.0005 ? m3 / ha : null, measured: measured };
   }
-  // Parzellen mit befahrener Fläche, grösste zuerst
-  function parcelList(d) {
-    var o = d.parcels || {};
-    return Object.keys(o).map(function (k) { return { nr: k, ha: Number((o[k] / 10000).toFixed(3)) }; }).sort(function (a, b) { return b.ha - a.ha; });
+
+  // ---------- Bericht ----------
+  var repMap = null, repLayer = null, repData = null, repClear = false;
+  function f1(v) { return v === null || v === undefined ? '–' : v.toFixed(1); }
+  function openReport(d, fresh, demo) {
+    repData = d; repClear = !!fresh;
+    d.demo = !!demo;
+    $('repTitle').textContent = demo ? 'Bericht (Demo)' : 'Bericht Gülleausbringung';
+    $('report').hidden = false;
+    $('report').scrollTop = 0;
+    drawReport(d);
+    resolveReport(d);
   }
-  function esc(s) { return String(s).replace(/[<>&]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; }); }
+  function closeReport() {
+    $('report').hidden = true;
+    // nach dem Abschliessen: Karte wieder leer, nur der gelbe Punkt – bereit für die nächste Aufzeichnung
+    if (repClear && !rec) { saved = null; coverLayer.clearLayers(); trackLine.setLatLngs([]); }
+    repData = null;
+    map.invalidateSize(); render();
+  }
+  $('repClose').addEventListener('click', closeReport);
+  $('repPrint').addEventListener('click', function () { if (repMap) repMap.invalidateSize(); window.print(); });
+  $('repKml').addEventListener('click', function () { if (repData) exportKml(repData); });
+  $('repGeo').addEventListener('click', function () { if (repData) exportGeo(repData); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('report').hidden) closeReport(); });
+
+  // Streifen ohne Parzelle (Funkloch, ältere Aufzeichnung): Umrisse nachladen, dann neu rechnen
+  function resolveReport(d) {
+    var n = (d.quads || []).length, todo = [], tries = 0;
+    d.qP = d.qP || []; d.pGeo = d.pGeo || {};
+    for (var i = 0; i < n; i++) if (!d.qP[i]) todo.push(i);
+    if (!todo.length) return;
+    $('repWait').hidden = false;
+    function next() {
+      todo = todo.filter(function (i) {
+        var c = quadCenter(d.quads[i]), p = parcelAt(c[0], c[1], d.pGeo) || parcelAt(c[0], c[1]);
+        if (p) { d.qP[i] = p.key; d.pGeo[p.key] = p; return false; }
+        return true;
+      });
+      if (!todo.length || tries >= 25) { done(); return; }
+      tries++;
+      var c = quadCenter(d.quads[todo[0]]);
+      parcelFetch(c[0], c[1]).then(function (p) { if (!p) todo.shift(); })   // hier keine Parzelle: überspringen
+        .catch(function () { tries = 99; })                                  // kein Netz: später nochmals
+        .then(next);
+    }
+    function done() {
+      $('repWait').hidden = true;
+      d.summary = summarize(d);
+      if (!d.demo && dbOk && !d.open) dbPut(d).catch(function () {});
+      if (repData === d && !$('report').hidden) drawReport(d);
+    }
+    next();
+  }
+  function drawReport(d) {
+    var sm = d.summary = summarize(d), st = d.stats || {}, c = d.cfg || cfg;
+    var t0 = new Date(d.start || d.date), t1 = d.end ? new Date(d.end) : null;
+    var hm = function (t) { return t.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' }); };
+    var named = sm.parcels.filter(function (p) { return p.key !== '?'; }).length;
+    var src = sm.measured ? 'gemessen' + (d.sensor ? ' (' + d.sensor + ')' : ' (Durchflussmesser)') + (c.flowCorr ? ', Korrektur ' + (c.flowCorr > 0 ? '+' : '') + c.flowCorr + ' %' : '')
+                          : 'berechnet aus Fläche × Soll ' + (c.rate || 0) + ' m³/ha (kein Durchflussmesser)';
+    $('repHead').innerHTML =
+      '<div class="stats">' +
+      '<div class="stat"><b>' + f1(sm.m3) + '<small>m³</small></b><span>Gülle</span></div>' +
+      '<div class="stat"><b>' + sm.ha.toFixed(2) + '<small>ha</small></b><span>Fläche</span></div>' +
+      '<div class="stat"><b>' + f1(sm.rate) + '<small>m³/ha</small></b><span>Ø Menge</span></div>' +
+      '<div class="stat"><b>' + named + '</b><span>Parzellen</span></div></div>' +
+      '<dl class="rep-meta" style="margin-top:14px">' +
+      '<dt>Datum</dt><dd>' + esc(t0.toLocaleDateString('de-CH', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })) + '</dd>' +
+      '<dt>Zeit</dt><dd>' + hm(t0) + (t1 ? ' – ' + hm(t1) : '') + ' · Arbeitszeit ' + mmss(st.ms || 0) + (d.pauses ? ' · ' + d.pauses + '× unterbrochen' : '') + '</dd>' +
+      '<dt>Gülle</dt><dd>' + esc(src) + '</dd>' +
+      '<dt>Soll</dt><dd>' + (c.rate || 0) + ' m³/ha · Arbeitsbreite ' + (c.width || 0).toFixed(2) + ' m</dd>' +
+      '<dt>Überlappung</dt><dd>' + Math.round(st.overlap || 0) + ' %' + (st.turns || d.turns ? ' · ' + (st.turns || d.turns) + ' Wendemanöver' : '') + '</dd>' +
+      '</dl>';
+    var rows = sm.parcels.map(function (p) {
+      var unk = p.key === '?';
+      return '<tr' + (unk ? ' class="unknown"' : '') + '><td>' + (unk ? 'ohne Zuordnung<small>Parzelle nicht ermittelt (kein Netz)</small>' : 'Parzelle <b>' + esc(p.nr) + '</b><small>' + esc([p.ak, p.egrid].filter(Boolean).join(' · ')) + '</small>') + '</td>' +
+        '<td>' + p.ha.toFixed(2) + '</td><td>' + f1(p.m3) + '</td><td>' + f1(p.rate) + '</td></tr>';
+    }).join('');
+    $('repTable').innerHTML = '<table class="rep-table"><thead><tr><th>Parzelle</th><th>Fläche ha</th><th>Gülle m³</th><th>m³/ha</th></tr></thead><tbody>' + rows +
+      '<tr class="sum"><td>Total</td><td>' + sm.ha.toFixed(2) + '</td><td>' + f1(sm.m3) + '</td><td>' + f1(sm.rate) + '</td></tr></tbody></table>';
+    drawRepMap(d, sm);
+  }
+  function drawRepMap(d, sm) {
+    if (!repMap) {
+      repMap = L.map('repMap', { zoomControl: true, renderer: L.canvas(), maxZoom: 21, rotateControl: false, touchRotate: false, shiftKeyRotate: false });
+      L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg', {
+        maxZoom: 21, maxNativeZoom: 20, attribution: 'Luftbild © <a href="https://www.swisstopo.admin.ch/">swisstopo</a>'
+      }).addTo(repMap);
+      repMap.attributionControl.setPrefix(false);
+      repLayer = L.layerGroup().addTo(repMap);
+    }
+    repLayer.clearLayers();
+    var bounds = L.latLngBounds([]);
+    (d.quads || []).forEach(function (q, i) { L.polygon(q, coverStyle(d.colors && d.colors[i])).addTo(repLayer); bounds.extend(q); });
+    trackSegs(d.track).forEach(function (s) { L.polyline(s, { color: '#FFFFFF', weight: 1.5, opacity: 0.9, interactive: false }).addTo(repLayer); bounds.extend(s); });
+    // Parzellen-Umriss gestrichelt, Beschriftung in der Mitte der begüllten Streifen dieser Parzelle
+    sm.parcels.forEach(function (p) {
+      var g = d.pGeo && d.pGeo[p.key];
+      if (g) g.polys.forEach(function (poly) { L.polygon(poly, { color: '#FFF005', weight: 2, dashArray: '6 4', fill: false, interactive: false }).addTo(repLayer); });
+      var lat = 0, lon = 0, k = 0;
+      (d.quads || []).forEach(function (q, i) { if (((d.qP && d.qP[i]) || '?') === p.key) { var c = quadCenter(q); lat += c[0]; lon += c[1]; k++; } });
+      if (!k || p.key === '?') return;
+      L.tooltip({ permanent: true, direction: 'center', className: 'rep-label', interactive: false })
+        .setLatLng([lat / k, lon / k]).setContent('<b>' + esc(p.nr) + '</b><small>' + f1(p.m3) + ' m³</small>').addTo(repLayer);
+    });
+    setTimeout(function () {
+      repMap.invalidateSize();
+      if (bounds.isValid()) repMap.fitBounds(bounds, { padding: [24, 24], maxZoom: 19 });
+    }, 60);
+  }
+
+  // ---------- Export ----------
   $('dlGeo').addEventListener('click', function () { exportGeo(current()); });
   $('dlKml').addEventListener('click', function () { exportKml(current()); });
+  function props(d, sm) {
+    var measured = sm.measured, c = d.cfg || cfg;
+    return { datum: d.date, flaeche_ha: Number(sm.ha.toFixed(3)), menge_m3: Number(sm.m3.toFixed(1)), menge_quelle: measured ? 'Durchflussmesser' : 'berechnet',
+      ueberlappung_prozent: Math.round((d.stats && d.stats.overlap) || 0), arbeitsbreite_m: c.width, positionsquelle: c.source === 'antenna' ? 'Antenne' : 'Handy',
+      abstand_verteiler_m: c.source === 'antenna' ? c.aOffset : c.offset, seitlicher_versatz_m: c.source === 'antenna' ? c.aSide : 0, ausbringmenge_m3_ha: c.rate,
+      wendemanoever: (d.stats && d.stats.turns) || 0, unterbrechungen: d.pauses || 0, durchfluss_korrektur_prozent: c.flowCorr || 0,
+      parzellen: sm.parcels.map(function (p) { return p.nr + ': ' + p.m3.toFixed(1) + ' m³ / ' + p.ha.toFixed(2) + ' ha'; }).join('; ') };
+  }
   function exportGeo(d) {
     if (!d || !d.quads.length) { showMsg('Noch keine Fläche aufgezeichnet.'); return; }
-    var base = props(d);
-    base.parzellen_flaeche = parcelList(d).map(function (x) { return { parzelle: x.nr, befahren_ha: x.ha }; });
+    var sm = summarize(d), base = props(d, sm);
     var features = CLASSES.map(function (cl) {
       var qs = d.quads.filter(function (q, i) { return ((d.colors && d.colors[i]) || YELLOW) === cl.color; });
       if (!qs.length) return null;
       return { type: 'Feature', properties: Object.assign({ klasse: cl.name }, base), geometry: { type: 'MultiPolygon', coordinates: qs.map(function (q) { var r = q.map(function (p) { return [p[1], p[0]]; }); r.push(r[0]); return [r]; }) } };
     }).filter(Boolean);
-    features.push({ type: 'Feature', properties: { name: 'Fahrspur' }, geometry: { type: 'LineString', coordinates: d.track.map(function (p) { return [p[1], p[0]]; }) } });
-    var gj = { type: 'FeatureCollection', features: features };
-    download(fileBase(d) + '.geojson', 'application/geo+json', JSON.stringify(gj));
+    sm.parcels.forEach(function (p) {
+      var g = d.pGeo && d.pGeo[p.key];
+      if (!g) return;
+      features.push({ type: 'Feature', properties: { name: 'Parzelle ' + p.nr, parzelle: p.nr, kanton: p.ak, egrid: p.egrid, flaeche_ha: Number(p.ha.toFixed(3)), guelle_m3: Number(p.m3.toFixed(1)), m3_pro_ha: p.rate === null ? null : Number(p.rate.toFixed(1)) },
+        geometry: { type: 'MultiPolygon', coordinates: g.polys.map(function (poly) { return poly.map(function (ring) { return ring.map(function (c) { return [c[1], c[0]]; }); }); }) } });
+    });
+    features.push({ type: 'Feature', properties: { name: 'Fahrspur' }, geometry: { type: 'MultiLineString', coordinates: trackSegs(d.track).map(function (s) { return s.map(function (p) { return [p[1], p[0]]; }); }) } });
+    download(fileBase(d) + '.geojson', 'application/geo+json', JSON.stringify({ type: 'FeatureCollection', features: features }));
   }
   function exportKml(d) {
     if (!d || !d.quads.length) { showMsg('Noch keine Fläche aufgezeichnet.'); return; }
-    var p = props(d);
-    function poly(q) { var r = q.concat([q[0]]); return '<Polygon><outerBoundaryIs><LinearRing><coordinates>' + r.map(function (pt) { return pt[1].toFixed(7) + ',' + pt[0].toFixed(7) + ',0'; }).join(' ') + '</coordinates></LinearRing></outerBoundaryIs></Polygon>'; }
-    var pl = parcelList(d);
-    var parcTxt = pl.length ? ' · Parzellen: ' + pl.map(function (x) { return esc(x.nr) + ' (' + x.ha.toFixed(2) + ' ha)'; }).join(', ') : '';
+    var sm = summarize(d), p = props(d, sm);
+    function ring(r) { return '<LinearRing><coordinates>' + r.map(function (pt) { return pt[1].toFixed(7) + ',' + pt[0].toFixed(7) + ',0'; }).join(' ') + '</coordinates></LinearRing>'; }
+    function poly(q) { return '<Polygon><outerBoundaryIs>' + ring(q.concat([q[0]])) + '</outerBoundaryIs></Polygon>'; }
     var styles = '', marks = '';
     CLASSES.forEach(function (cl, n) {
       var qs = d.quads.filter(function (q, i) { return ((d.colors && d.colors[i]) || YELLOW) === cl.color; });
       if (!qs.length) return;
       styles += '<Style id="f' + n + '"><LineStyle><width>0</width></LineStyle><PolyStyle><color>' + cl.kml + '</color><outline>0</outline></PolyStyle></Style>';
-      marks += '<Placemark><name>' + cl.name + '</name><description>Fläche ' + p.flaeche_ha + ' ha · Menge ' + p.menge_m3 + ' m³ (' + p.menge_quelle + ') · Überlappung ' + p.ueberlappung_prozent + ' % · Arbeitsbreite ' + p.arbeitsbreite_m + ' m · Soll ' + p.ausbringmenge_m3_ha + ' m³/ha · Wendemanöver ' + p.wendemanoever + parcTxt + '</description><styleUrl>#f' + n + '</styleUrl><MultiGeometry>' + qs.map(poly).join('') + '</MultiGeometry></Placemark>';
+      marks += '<Placemark><name>' + cl.name + '</name><description>Fläche ' + p.flaeche_ha + ' ha · Gülle ' + p.menge_m3 + ' m³ (' + p.menge_quelle + ') · Überlappung ' + p.ueberlappung_prozent + ' % · Arbeitsbreite ' + p.arbeitsbreite_m + ' m · Soll ' + p.ausbringmenge_m3_ha + ' m³/ha</description><styleUrl>#f' + n + '</styleUrl><MultiGeometry>' + qs.map(poly).join('') + '</MultiGeometry></Placemark>';
     });
-    var line = '<LineString><coordinates>' + d.track.map(function (pt) { return pt[1].toFixed(7) + ',' + pt[0].toFixed(7) + ',0'; }).join(' ') + '</coordinates></LineString>';
-    var kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Gülle-Karte ' + p.datum.slice(0, 10) + '</name>' + styles +
+    styles += '<Style id="p"><LineStyle><color>ff05f0ff</color><width>2</width></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>';
+    sm.parcels.forEach(function (x) {
+      var g = d.pGeo && d.pGeo[x.key];
+      if (!g) return;
+      marks += '<Placemark><name>Parzelle ' + esc(x.nr) + '</name><description>' + x.m3.toFixed(1) + ' m³ auf ' + x.ha.toFixed(2) + ' ha' + (x.rate !== null ? ' = ' + x.rate.toFixed(1) + ' m³/ha' : '') + (x.egrid ? ' · ' + esc(x.egrid) : '') + '</description><styleUrl>#p</styleUrl><MultiGeometry>' +
+        g.polys.map(function (pl) { return '<Polygon><outerBoundaryIs>' + ring(pl[0]) + '</outerBoundaryIs>' + pl.slice(1).map(function (h) { return '<innerBoundaryIs>' + ring(h) + '</innerBoundaryIs>'; }).join('') + '</Polygon>'; }).join('') + '</MultiGeometry></Placemark>';
+    });
+    var lines = trackSegs(d.track).map(function (s) { return '<LineString><coordinates>' + s.map(function (pt) { return pt[1].toFixed(7) + ',' + pt[0].toFixed(7) + ',0'; }).join(' ') + '</coordinates></LineString>'; }).join('');
+    var kml = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Gülle ' + p.datum.slice(0, 10) + '</name>' + styles +
       '<Style id="t"><LineStyle><color>ffffffff</color><width>2</width></LineStyle></Style>' + marks +
-      '<Placemark><name>Fahrspur</name><styleUrl>#t</styleUrl>' + line + '</Placemark>' +
-      (pl.length ? '<ExtendedData>' + pl.map(function (x) { return '<Data name="Parzelle ' + esc(x.nr) + '"><value>' + x.ha.toFixed(3) + ' ha befahren</value></Data>'; }).join('') + '</ExtendedData>' : '') +
+      '<Placemark><name>Fahrspur</name><styleUrl>#t</styleUrl><MultiGeometry>' + lines + '</MultiGeometry></Placemark>' +
+      '<ExtendedData>' + sm.parcels.map(function (x) { return '<Data name="Parzelle ' + esc(x.nr) + '"><value>' + x.m3.toFixed(1) + ' m³ · ' + x.ha.toFixed(3) + ' ha</value></Data>'; }).join('') + '</ExtendedData>' +
       '</Document></kml>';
     download(fileBase(d) + '.kml', 'application/vnd.google-earth.kml+xml', kml);
   }
@@ -1629,18 +1943,29 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   setHeadingUp(cfg.headingUp);
   showPower();
   setView(location.hash === '#tempo' ? 'tempo' : 'karte');   // Standard: Karte
+  // Vor dem Start nur die aktuelle Position. Eine nicht abgeschlossene Aufzeichnung (App geschlossen,
+  // Absturz, Akku leer) kommt unterbrochen zurück: «Weiter aufzeichnen» oder «Abschliessen».
   try {
-    saved = JSON.parse(localStorage.getItem(STORE));
-    if (saved && saved.quads && saved.quads.length) {
-      // ältere Karten ohne Kennung übernehmen und in die Liste stellen
-      if (!saved.id) { saved.start = saved.start || Date.parse(saved.date) || Date.now(); saved.id = 'r' + saved.start; persist(saved); }
-      dbPut(saved).catch(function () {});
-      drawSaved(saved, true);
-      // open = beim letzten Mal nicht gestoppt (App geschlossen, Absturz, Akku leer)
-      setStatus(saved.open ? 'Aufzeichnung wurde unterbrochen – «Fortsetzen» macht weiter' : 'Letzte Karte vom ' + new Date(saved.date).toLocaleDateString('de-CH'), !!saved.open);
-    } else saved = null;
-  } catch (e) { saved = null; }
+    var s0 = JSON.parse(localStorage.getItem(STORE));
+    if (s0 && s0.open && ((s0.quads && s0.quads.length) || (s0.track && s0.track.length))) {
+      if (!s0.id) { s0.start = s0.start || Date.parse(s0.date) || Date.now(); s0.id = 'r' + s0.start; }
+      dbPut(s0).catch(function () {});
+      rec = restoreRec(s0);
+      drawSaved(s0, true);
+      startRecUI();
+      setStatus('Aufzeichnung vom ' + recTitle(s0) + ' war noch offen – «Weiter aufzeichnen» oder «Abschliessen»', false, 'paused');
+      statusHoldUntil = Date.now() + 10000;
+    } else if (s0) {
+      // ältere, abgeschlossene Karte: bleibt in der Liste, wird aber nicht mehr angezeigt
+      if (s0.quads && s0.quads.length) { if (!s0.id) { s0.start = s0.start || Date.parse(s0.date) || Date.now(); s0.id = 'r' + s0.start; } s0.open = false; dbPut(s0).catch(function () {}); }
+      try { localStorage.removeItem(STORE); } catch (e) {}
+    }
+  } catch (e) { rec = null; }
+  saved = null;
+  // GPS gleich einschalten: der gelbe Punkt zeigt die aktuelle Position
+  if ('geolocation' in navigator && window.isSecureContext) startGps();
   updateActions();
+  showRecStatus();
   render();
 })();
 </script>
