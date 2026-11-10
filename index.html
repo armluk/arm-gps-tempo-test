@@ -273,8 +273,8 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <h2>Ausbringung</h2>
 <div class="set">
 <div class="set-row">
-<div class="set-head"><label for="width">Arbeitsbreite</label><output id="widthOut">12.00 m</output></div>
-<div class="ctrl"><button class="step" type="button" data-k="width" data-d="-1" aria-label="Arbeitsbreite um 0.25 m verringern">−</button><input id="width" type="range" min="5" max="30" step="0.25" value="12"><button class="step" type="button" data-k="width" data-d="1" aria-label="Arbeitsbreite um 0.25 m erhöhen">+</button></div>
+<div class="set-head"><label for="width">Arbeitsbreite</label><output id="widthOut">15.00 m</output></div>
+<div class="ctrl"><button class="step" type="button" data-k="width" data-d="-1" aria-label="Arbeitsbreite um 0.25 m verringern">−</button><input id="width" type="range" min="5" max="30" step="0.25" value="15"><button class="step" type="button" data-k="width" data-d="1" aria-label="Arbeitsbreite um 0.25 m erhöhen">+</button></div>
 </div>
 <div class="set-row">
 <div class="set-head"><label for="rate">Ausbringmenge</label><output id="rateOut">25 m³/ha</output></div>
@@ -311,8 +311,8 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 </div>
 </div>
 <div class="set-row" id="rowPhone">
-<div class="set-head"><label for="offset">Abstand Traktor–Verteiler</label><output id="offsetOut">3.0 m</output></div>
-<div class="ctrl"><button class="step" type="button" data-k="offset" data-d="-1" aria-label="Abstand um 0.5 m verringern">−</button><input id="offset" type="range" min="0" max="15" step="0.5" value="3"><button class="step" type="button" data-k="offset" data-d="1" aria-label="Abstand um 0.5 m erhöhen">+</button></div>
+<div class="set-head"><label for="offset">Abstand Traktor–Verteiler</label><output id="offsetOut">2.0 m</output></div>
+<div class="ctrl"><button class="step" type="button" data-k="offset" data-d="-1" aria-label="Abstand um 0.5 m verringern">−</button><input id="offset" type="range" min="0" max="15" step="0.5" value="2"><button class="step" type="button" data-k="offset" data-d="1" aria-label="Abstand um 0.5 m erhöhen">+</button></div>
 </div>
 <div class="set-row" id="rowAnt" hidden>
 <div class="set-head"><label for="aOffset">Antenne → Verteiler (Fahrtrichtung)</label><output id="aOffsetOut">0.00 m</output></div>
@@ -338,9 +338,9 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <p class="note">Unter 5 m³/h gilt als kein Durchfluss. Schwankt der Durchfluss in Sekundenbruchteilen stärker als diese Grenze, wird Luft eingeblasen (Ausblasen): nicht einfärben, keine Liter zählen. Die Schwankung bei normalem Ausbringen steht oben unter «Jetzt» – die Grenze deutlich darüber setzen.</p>
 </div>
 <div class="set-row">
-<div class="set-head"><label for="flowCorr">Durchfluss-Korrektur</label><output id="flowCorrOut">0 %</output></div>
-<div class="ctrl"><button class="step" type="button" data-k="flowCorr" data-d="-1" aria-label="Korrektur um 1 % verringern">−</button><input id="flowCorr" type="range" min="-15" max="15" step="1" value="0"><button class="step" type="button" data-k="flowCorr" data-d="1" aria-label="Korrektur um 1 % erhöhen">+</button></div>
-<p class="note">Gleicht kleine Abweichungen durch die unterschiedliche Dichte der Gülle aus. Wirkt auf Durchfluss, Ist-Menge und gemessene m³. Beispiel: +3 % = Messwert × 1.03.</p>
+<div class="set-head"><label for="flowCorr">Durchfluss-Korrektur</label><output id="flowCorrOut">-5 %</output></div>
+<div class="ctrl"><button class="step" type="button" data-k="flowCorr" data-d="-1" aria-label="Korrektur um 1 % verringern">−</button><input id="flowCorr" type="range" min="-15" max="15" step="1" value="-5"><button class="step" type="button" data-k="flowCorr" data-d="1" aria-label="Korrektur um 1 % erhöhen">+</button></div>
+<p class="note">Gleicht kleine Abweichungen durch die unterschiedliche Dichte der Gülle aus. Wirkt auf Durchfluss, Ist-Menge und gemessene m³. Standard −5 %: der Zähler zeigt nach den ersten Rückmeldungen etwa 5 % zu viel. Beispiel: −5 % = Messwert × 0.95.</p>
 </div>
 <div class="set-row">
 <button class="btn line" id="dfuBtn" type="button"><span>Sensor-Update starten</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
@@ -1072,7 +1072,10 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   showSensorHint();
 
   // ---------- Zustand ----------
-  var cfg = { width: 12, offset: 3, rate: 25, pump: 120, source: 'phone', aOffset: 0, aSide: 0, turnPause: true, headingUp: false, blowSpread: 15, flowCorr: 0 };
+  // Standardwerte (Stand 10.11.2026 nach den ersten Rückmeldungen): Schleppschlauch 15 m, Verteiler 2 m hinter dem Handy,
+  // Durchflusszähler zeigt etwa 5 % zu viel -> Korrektur −5 %
+  var CFG_VERSION = 2;
+  var cfg = { width: 15, offset: 2, rate: 25, pump: 120, source: 'phone', aOffset: 0, aSide: 0, turnPause: true, headingUp: false, blowSpread: 15, flowCorr: -5, v: CFG_VERSION };
   var KEYS = ['width', 'offset', 'rate', 'pump', 'aOffset', 'aSide', 'blowSpread', 'flowCorr'];
   var steps = { width: 0.25, offset: 0.5, rate: 1, pump: 5, aOffset: 0.05, aSide: 0.05, blowSpread: 1, flowCorr: 1 };
   var fmtCfg = {
@@ -2280,7 +2283,19 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   }
 
   // ---------- Laden ----------
-  try { var c0 = JSON.parse(localStorage.getItem(STORE + '-cfg')); if (c0) cfg = Object.assign(cfg, c0); } catch (e) {}
+  try {
+    var c0 = JSON.parse(localStorage.getItem(STORE + '-cfg'));
+    if (c0) {
+      // einmalig auf die neuen Standardwerte umstellen – aber nur, was noch auf dem alten Standard stand
+      if (!c0.v || c0.v < 2) {
+        if (c0.width === 12) delete c0.width;
+        if (c0.offset === 3) delete c0.offset;
+        if (!c0.flowCorr) delete c0.flowCorr;
+        c0.v = CFG_VERSION;
+      }
+      cfg = Object.assign(cfg, c0);
+    }
+  } catch (e) {}
   KEYS.forEach(function (k) { setCfg(k, cfg[k]); });
   setSource(cfg.source);
   setTurnPause(cfg.turnPause);
