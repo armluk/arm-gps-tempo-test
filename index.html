@@ -340,7 +340,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
 <div class="set-row">
 <div class="set-head"><label for="flowCorr">Durchfluss-Korrektur</label><output id="flowCorrOut">-5 %</output></div>
 <div class="ctrl"><button class="step" type="button" data-k="flowCorr" data-d="-1" aria-label="Korrektur um 1 % verringern">−</button><input id="flowCorr" type="range" min="-15" max="15" step="1" value="-5"><button class="step" type="button" data-k="flowCorr" data-d="1" aria-label="Korrektur um 1 % erhöhen">+</button></div>
-<p class="note">Gleicht kleine Abweichungen durch die unterschiedliche Dichte der Gülle aus. Wirkt auf Durchfluss, Ist-Menge und gemessene m³. Standard −5 %: der Zähler zeigt nach den ersten Rückmeldungen etwa 5 % zu viel. Beispiel: −5 % = Messwert × 0.95.</p>
+<p class="note">Gleicht kleine Abweichungen durch die unterschiedliche Dichte der Gülle aus. Wirkt auf Durchfluss, Ist-Menge und gemessene m³. Standard −5 %: der Zähler zeigt nach den ersten Rückmeldungen etwa 5 % zu viel. Beispiel: −5 % = Messwert × 0.95. Die App speichert die Rohwerte vom Zähler: Wird die Korrektur während einer offenen Aufzeichnung verstellt, gilt sie für die ganze Aufzeichnung – alles wird neu berechnet und eingefärbt, und der Bericht vermerkt die Änderung. Abgeschlossene Aufzeichnungen bleiben unverändert.</p>
 </div>
 <div class="set-row">
 <button class="btn line" id="dfuBtn" type="button"><span>Sensor-Update starten</span><svg width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M1 7h19"/><path d="M14 1l6 6-6 6"/></svg></button>
@@ -945,10 +945,39 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     if (!flow.connected) return cfg.pump * 10 / (v * cfg.width);  // ohne Durchflussmesser: eingestellte Pumpe, m³/h × 10 ÷ (km/h × m)
     return null;
   }
-  function rateColor() {
-    var ar = actualRate();
-    if (ar === null || cfg.rate <= 0) return YELLOW;
-    return ar < cfg.rate * 0.9 ? LOW : ar > cfg.rate * 1.1 ? HIGH : YELLOW;
+  function classColor(ar, soll) {
+    if (ar === null || ar === undefined || !(soll > 0)) return YELLOW;
+    return ar < soll * 0.9 ? LOW : ar > soll * 1.1 ? HIGH : YELLOW;
+  }
+  function rateColor() { return classColor(actualRate(), cfg.rate); }
+  // Durchfluss-Korrektur: gespeichert werden immer die Rohwerte vom Zähler, die Korrektur wird erst beim Rechnen
+  // angewendet. Offene Aufzeichnungen folgen dem Regler (alles wird neu gerechnet), abgeschlossene behalten ihren Wert.
+  // Ältere Aufzeichnungen (vor 10.11.2026) haben schon korrigierte Liter gespeichert -> Faktor 1.
+  function corrNow() { return 1 + (cfg.flowCorr || 0) / 100; }
+  function corrOf(d) { return d && d.rawL ? 1 + (((d.cfg && d.cfg.flowCorr) || 0) / 100) : 1; }
+  // Regler verschoben: Live-Anzeige sofort anpassen, die offene Aufzeichnung kurz danach neu einfärben
+  var corrPend = null;
+  function corrChanged(oldPct, newPct) {
+    var ratio = (1 + newPct / 100) / (1 + oldPct / 100);
+    if (flow.lmin !== null) flow.lmin *= ratio;
+    (flow.hist || []).forEach(function (x) { x.v *= ratio; });
+    if (!rec) return;
+    if (!corrPend) corrPend = { from: oldPct, timer: null };
+    clearTimeout(corrPend.timer);
+    corrPend.timer = setTimeout(function () {
+      var from = corrPend.from; corrPend = null;
+      if (!rec || from === cfg.flowCorr) return;
+      var f = corrNow();
+      rec.colors = rec.quads.map(function (q, i) {
+        var qi = rec.qI[i];
+        if (qi === null || qi === undefined) return rec.colors[i];
+        return classColor(typeof rec.qL[i] === 'number' ? qi * f : qi, rec.qT[i]);
+      });
+      coverLayer.clearLayers();
+      rec.quads.forEach(function (q, i) { L.polygon(q, coverStyle(rec.colors[i])).addTo(coverLayer); });
+      rec.corrLog.push({ t: Date.now(), von: from, auf: cfg.flowCorr });
+      autosave(); render();
+    }, 400);
   }
   // Farbklassen für Karte und Export (KML-Farbe: aabbggrr)
   var CLASSES = [
@@ -973,9 +1002,10 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     // Unter 5 m³/h und beim Ausblasen (Luft) werden keine Liter gezählt.
     // Während der Unterbrechung wird nichts gezählt. Die Liter warten in pendL, bis der nächste Streifen
     // entsteht; so gehören sie zu dem Ort, an dem sie ausgebracht wurden.
+    // Gespeichert werden die Rohwerte vom Zähler (ohne Korrektur) – die Korrektur rechnet die Auswertung.
     if (rec) {
       if (!rec.paused && rec.lastTotal !== null && flowActive()) {
-        var d = total - rec.lastTotal, add = (d >= 0 ? d : total) * corr;
+        var d = total - rec.lastTotal, add = d >= 0 ? d : total;
         rec.liters += add; rec.pendL += add;
       }
       rec.lastTotal = total; rec.flowSeen = true;
@@ -1096,7 +1126,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   function newRec() {
     var now = Date.now();
     return { id: 'r' + now, origin: null, prevBoom: null, ref: null, quads: [], colors: [], track: [], trackDraw: [], cells: new Set(), sum: 0,
-      qA: [], qL: [], qR: [], qP: [], pGeo: {}, pendL: 0, calcM3: 0,
+      qA: [], qL: [], qR: [], qP: [], qI: [], qT: [], pGeo: {}, pendL: 0, calcM3: 0, rawL: true, corrLog: [],
       start: now, segStart: now, msBefore: 0, end: null, liters: 0, lastTotal: null, flowSeen: false,
       odo: 0, lastP: null, hist: [], curve: null, turning: false, turns: 0, paused: false, pauses: 0 };
   }
@@ -1161,7 +1191,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   function stats() {
     if (rec) {
       var area = rec.cells.size / 10000;
-      var measured = rec.flowSeen ? rec.liters / 1000 : null;
+      var measured = rec.flowSeen ? rec.liters * corrNow() / 1000 : null;   // Rohliter × aktuelle Korrektur
       // Arbeitsdauer ohne die Unterbrechungen
       var ms = rec.msBefore + (rec.segStart ? (rec.end || Date.now()) - rec.segStart : 0);
       return { area: area, overlap: rec.sum > 0 ? Math.max(0, rec.sum - rec.cells.size) / rec.sum * 100 : 0, ms: ms, measured: measured, calc: rec.calcM3, turns: rec.turns };
@@ -1183,7 +1213,9 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     renderSpeed(v);
     var st = stats();
     $('sArea').innerHTML = st.area.toFixed(2) + '<small>ha</small>';
-    var amount = st.measured !== null && st.measured !== undefined ? st.measured : typeof st.calc === 'number' ? st.calc : st.area * (st.rate || cfg.rate);
+    // gemessen + berechnet (Strecken ohne Durchflussmesser, z. B. Sensor kurz getrennt)
+    var hasM = st.measured !== null && st.measured !== undefined, hasC = typeof st.calc === 'number';
+    var amount = hasM || hasC ? (hasM ? st.measured : 0) + (hasC ? st.calc : 0) : st.area * (st.rate || cfg.rate);
     $('sAmount').innerHTML = Math.round(amount) + '<small>m³</small>';
     $('sOverlap').innerHTML = Math.round(st.overlap) + '<small>%</small>';
     updateActions();
@@ -1252,7 +1284,9 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   function setCfg(k, v) {
     var el = $(k), min = parseFloat(el.min), max = parseFloat(el.max);
     v = Math.min(max, Math.max(min, Math.round(v / steps[k]) * steps[k]));
+    var old = cfg[k];
     cfg[k] = Number(v.toFixed(2));
+    if (k === 'flowCorr' && old !== cfg[k]) corrChanged(old, cfg[k]);   // offene Aufzeichnung neu rechnen
     el.value = cfg[k];
     $(k + 'Out').textContent = fmtCfg[k](cfg[k]);
     saveCfg();
@@ -1347,9 +1381,12 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       rec.sum += a;
       // Streifen merken: Fläche, Gülle seit dem letzten Streifen, Soll und Parzelle (nach Lage der Streifen-Mitte)
       // ohne Durchflussmesser: Menge auf diesem Streifen aus Pumpen-Volumenstrom und Tempo (= Pumpe × Zeit)
-      var ar = actualRate(), qr = !rec.flowSeen && ar !== null ? ar : cfg.rate;
-      rec.qA.push(a); rec.qL.push(rec.flowSeen ? rec.pendL : null); rec.qR.push(qr); rec.qP.push(null);
-      rec.calcM3 += a / 10000 * qr;
+      // mit Durchflussmesser: Rohliter vom Zähler; Ist-Menge qI ohne Korrektur (für das Neu-Einfärben)
+      var measuredNow = flow.connected;
+      var ar = actualRate(), qr = !measuredNow && ar !== null ? ar : cfg.rate;
+      rec.qA.push(a); rec.qL.push(measuredNow ? rec.pendL : null); rec.qR.push(qr); rec.qP.push(null);
+      rec.qI.push(ar === null ? null : measuredNow ? ar / corrNow() : ar); rec.qT.push(cfg.rate);
+      if (!measuredNow) rec.calcM3 += a / 10000 * qr;
       rec.pendL = 0;
       assignQuad(rec, rec.quads.length - 1);
       rasterize(rec, q);
@@ -1417,7 +1454,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     var pGeo = {};
     rec.qP.forEach(function (k) { if (k && rec.pGeo[k]) pGeo[k] = rec.pGeo[k]; });
     return { id: rec.id, open: open, paused: rec.paused, pauses: rec.pauses, quads: rec.quads, colors: rec.colors, track: rec.track, trackDraw: rec.trackDraw,
-      qA: rec.qA, qL: rec.qL, qR: rec.qR, qP: rec.qP, pGeo: pGeo, pendL: rec.pendL,
+      qA: rec.qA, qL: rec.qL, qR: rec.qR, qP: rec.qP, qI: rec.qI, qT: rec.qT, pGeo: pGeo, pendL: rec.pendL, rawL: true, corrLog: rec.corrLog,
       origin: rec.origin, sum: rec.sum, turns: rec.turns, liters: rec.liters, flowSeen: rec.flowSeen, msTotal: st.ms, start: rec.start, end: rec.end,
       sensor: flow.device && flow.device.name || null,
       stats: st, cfg: JSON.parse(JSON.stringify(cfg)), date: new Date(rec.start).toISOString() };
@@ -1443,8 +1480,10 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     var n = r.quads.length;
     r.qA = s.qA || []; r.qL = s.qL || []; r.qR = s.qR || []; r.qP = s.qP || []; r.pGeo = s.pGeo || {};
     for (var i = r.qP.length; i < n; i++) { r.qA.push(null); r.qL.push(null); r.qR.push((s.cfg && s.cfg.rate) || cfg.rate); r.qP.push(null); }
+    r.qI = s.qI || []; r.qT = s.qT || [];
+    for (i = r.qI.length; i < n; i++) { r.qI.push(null); r.qT.push(r.qR[i]); }
     Object.keys(r.pGeo).forEach(function (k) { if (!pcache[k]) pcache[k] = r.pGeo[k]; });
-    r.pendL = s.pendL || 0; r.pauses = s.pauses || 0;
+    r.pendL = s.pendL || 0; r.pauses = s.pauses || 0; r.corrLog = s.corrLog || [];
     r.origin = s.origin || (r.quads.length ? { lat: r.quads[0][0][0], lon: r.quads[0][0][1] } : null);
     r.turns = s.turns || (s.stats && s.stats.turns) || 0;
     r.flowSeen = !!(s.flowSeen || (s.stats && s.stats.measured !== null && s.stats.measured !== undefined));
@@ -1463,7 +1502,15 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     });
     if (typeof s.sum === 'number') r.sum = s.sum;
     for (i = 0; i < n; i++) if (!r.qP[i]) assignQuad(r, i);
-    r.calcM3 = r.qA.reduce(function (sum, a, j) { return sum + (a || 0) / 10000 * (r.qR[j] || 0); }, 0);
+    // ältere offene Aufzeichnung mit schon korrigierten Litern: auf Rohwerte umrechnen, damit der Regler weiter gilt
+    if (!s.rawL && r.flowSeen) {
+      var f0 = 1 + (((s.cfg && s.cfg.flowCorr) || 0) / 100);
+      r.liters /= f0; r.pendL /= f0;
+      r.qL = r.qL.map(function (x) { return typeof x === 'number' ? x / f0 : x; });
+    }
+    r.rawL = true;
+    // berechnete Menge nur für Streifen ohne Durchflussmesser
+    r.calcM3 = r.qA.reduce(function (sum, a, j) { return sum + (typeof r.qL[j] === 'number' ? 0 : (a || 0) / 10000 * (r.qR[j] || 0)); }, 0);
     return r;
   }
   // Fahrspur: Unterbrechungen sind als null gespeichert -> einzelne Abschnitte
@@ -1776,12 +1823,15 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     var areas = xys.map(function (xy, i) { return d.qA && typeof d.qA[i] === 'number' ? d.qA[i] : shoelace(xy); });
     var totA = areas.reduce(function (s, a) { return s + a; }, 0);
     var perQuad = measured && qL.some(function (x) { return typeof x === 'number'; });
+    var f = corrOf(d), gotM = 0;                     // Rohliter × Korrektur dieser Aufzeichnung
     var by = {}, owner = new Map();
     function entry(k) { return by[k] || (by[k] = { key: k, cells: 0, L: 0 }); }
     xys.forEach(function (q, i) {
-      var e = entry((d.qP && d.qP[i]) || '?');
-      e.L += measured ? (perQuad ? (qL[i] || 0) : (totA ? (d.liters || 0) * areas[i] / totA : 0))
-                      : areas[i] / 10000 * ((d.qR && d.qR[i]) || rate) * 1000;
+      var e = entry((d.qP && d.qP[i]) || '?'), L;
+      if (perQuad && typeof qL[i] === 'number') { L = qL[i] * f; gotM += L; }            // gemessen
+      else if (measured && !perQuad) { L = totA ? (d.liters || 0) * f * areas[i] / totA : 0; gotM += L; }   // ältere Aufzeichnung
+      else L = areas[i] / 10000 * ((d.qR && d.qR[i]) || rate) * 1000;                    // ohne Durchflussmesser berechnet
+      e.L += L;
       var minX = Math.floor(Math.min(q[0].x, q[1].x, q[2].x, q[3].x)), maxX = Math.ceil(Math.max(q[0].x, q[1].x, q[2].x, q[3].x));
       var minY = Math.floor(Math.min(q[0].y, q[1].y, q[2].y, q[3].y)), maxY = Math.ceil(Math.max(q[0].y, q[1].y, q[2].y, q[3].y));
       for (var x = minX; x < maxX; x += CELL) for (var y = minY; y < maxY; y += CELL) {
@@ -1791,8 +1841,8 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     });
     // gemessene Gülle ohne Streifen (z. B. nur im Stand gepumpt): «ohne Zuordnung»
     if (measured) {
-      var got = Object.keys(by).reduce(function (s, k) { return s + by[k].L; }, 0);
-      if ((d.liters || 0) - got > 50) entry('?').L += d.liters - got;
+      var rest = (d.liters || 0) * f - gotM;
+      if (rest > 50) entry('?').L += rest;
     }
     var parcels = Object.keys(by).map(function (k) {
       var e = by[k], g = d.pGeo && d.pGeo[k], ha = e.cells / 10000, m3 = e.L / 1000;
@@ -1803,6 +1853,13 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
   }
 
   // ---------- Bericht ----------
+  // Korrektur während der Aufzeichnung angepasst: im Bericht offenlegen (wichtig für die Abrechnung)
+  function corrNote(d) {
+    var l = d.corrLog || [];
+    if (!l.length) return '';
+    var p = function (v) { return (v > 0 ? '+' : '') + v + ' %'; };
+    return ' – während der Aufzeichnung von ' + p(l[0].von) + ' angepasst, gilt für die ganze Aufzeichnung';
+  }
   var repMap = null, repLayer = null, repData = null, repClear = false;
   function f1(v) { return v === null || v === undefined ? '–' : v.toFixed(1); }
   function openReport(d, fresh, demo) {
@@ -1865,7 +1922,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     var t0 = new Date(d.start || d.date), t1 = d.end ? new Date(d.end) : null;
     var hm = function (t) { return t.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' }); };
     var named = sm.parcels.filter(function (p) { return p.key !== '?'; }).length;
-    var src = sm.measured ? 'gemessen' + (d.sensor ? ' (' + d.sensor + ')' : ' (Durchflussmesser)') + (c.flowCorr ? ', Korrektur ' + (c.flowCorr > 0 ? '+' : '') + c.flowCorr + ' %' : '')
+    var src = sm.measured ? 'gemessen' + (d.sensor ? ' (' + d.sensor + ')' : ' (Durchflussmesser)') + (c.flowCorr || (d.corrLog && d.corrLog.length) ? ', Korrektur ' + (c.flowCorr > 0 ? '+' : '') + (c.flowCorr || 0) + ' %' : '') + corrNote(d)
                           : c.pump ? 'berechnet aus Pumpen-Volumenstrom ' + c.pump + ' m³/h und Tempo (kein Durchflussmesser)'
                                    : 'berechnet aus Fläche × Soll ' + (c.rate || 0) + ' m³/ha (kein Durchflussmesser)';
     $('repHead').innerHTML =
@@ -2120,10 +2177,13 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
         gray(); doc.setFontSize(7.5); doc.text(b[1].toUpperCase(), bx + 3, y + 13.5);
       });
       y += 21;
-      var src = sm.measured ? 'gemessen' + (d.sensor ? ' mit ' + d.sensor : ' (Durchflussmesser)') + (c.flowCorr ? ', Korrektur ' + (c.flowCorr > 0 ? '+' : '') + c.flowCorr + ' %' : '')
+      var src = sm.measured ? 'gemessen' + (d.sensor ? ' mit ' + d.sensor : ' (Durchflussmesser)') + (c.flowCorr || (d.corrLog && d.corrLog.length) ? ', Korrektur ' + (c.flowCorr > 0 ? '+' : '') + (c.flowCorr || 0) + ' %' : '') + corrNote(d)
               : c.pump ? 'berechnet aus Pumpen-Volumenstrom ' + c.pump + ' m³/h und Tempo' : 'berechnet aus Fläche × Soll';
       gray(); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
-      doc.text('Gülle: ' + src + ' · Überlappung ' + Math.round(st.overlap || 0) + ' %', L0, y);
+      doc.splitTextToSize(dash('Gülle: ' + src + ' · Überlappung ' + Math.round(st.overlap || 0) + ' %'), R0 - L0).forEach(function (l, i) {
+        if (i) y += 4;
+        doc.text(l, L0, y);
+      });
       y += 4;
       // Karte
       if (img) {
