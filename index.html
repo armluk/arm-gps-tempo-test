@@ -1003,14 +1003,38 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     // Während der Unterbrechung wird nichts gezählt. Die Liter warten in pendL, bis der nächste Streifen
     // entsteht; so gehören sie zu dem Ort, an dem sie ausgebracht wurden.
     // Gespeichert werden die Rohwerte vom Zähler (ohne Korrektur) – die Korrektur rechnet die Auswertung.
+    // Entscheidend ist der Durchfluss über die ganze Zeit seit der letzten Meldung, nicht nur der Augenblick:
+    // sonst ginge nach einer Lücke (App im Hintergrund, Bluetooth kurz weg) die ganze Menge verloren, wenn die
+    // Pumpe beim Zurückkommen gerade still steht.
     if (rec) {
-      if (!rec.paused && rec.lastTotal !== null && flowActive()) {
+      var now = Date.now();
+      if (!rec.paused && rec.lastTotal !== null) {
         var d = total - rec.lastTotal, add = d >= 0 ? d : total;
-        rec.liters += add; rec.pendL += add;
+        var dt = rec.lastFlowAt ? (now - rec.lastFlowAt) / 1000 : 1;
+        var avgLmin = add / Math.max(dt, 0.5) * 60 * corr;            // Ø l/min seit der letzten Meldung
+        var gap = dt > GAP_S;
+        var counts = gap ? (avgLmin >= MIN_FLOW || add >= 50)          // Lücke: was der Zähler zählte, war Gülle
+                         : !flow.blowing && (flowActive() || avgLmin >= MIN_FLOW);
+        if (counts && add > 0) {
+          rec.liters += add;
+          if (gap) {
+            // ohne Position: nicht dem nächsten Streifen zuschlagen, sondern «ohne Zuordnung» (Total stimmt trotzdem)
+            flushPend(rec);
+            rec.gapL += add; rec.gaps.push({ t: now, s: Math.round(dt), l: add });
+            gapNotice(dt, add * corr);
+          } else rec.pendL += add;
+        }
       }
-      rec.lastTotal = total; rec.flowSeen = true;
+      rec.lastTotal = total; rec.lastFlowAt = now; rec.flowSeen = true;
     }
     render();
+  }
+  // Lücke in den Meldungen (App nicht vorne, Bluetooth weg): ab dieser Dauer ohne Meldung gilt sie als Lücke
+  var GAP_S = 6;
+  function gapNotice(dt, liters) {
+    statusHoldUntil = 0;
+    setStatus(mmss(dt * 1000) + ' ohne Verbindung – ' + (Math.round(liters) / 1000).toFixed(1) + ' m³ gezählt, im Bericht «ohne Zuordnung»', !!(rec && !rec.paused), 'warn');
+    statusHoldUntil = Date.now() + 8000;
   }
   function setFlowBtn(text) { $('flowBtn').firstElementChild.textContent = text; }
   function connectFlow() {
@@ -1127,6 +1151,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     var now = Date.now();
     return { id: 'r' + now, origin: null, prevBoom: null, ref: null, quads: [], colors: [], track: [], trackDraw: [], cells: new Set(), sum: 0,
       qA: [], qL: [], qR: [], qP: [], qI: [], qT: [], pGeo: {}, pendL: 0, calcM3: 0, rawL: true, corrLog: [],
+      gapL: 0, gaps: [], lastFlowAt: null,
       start: now, segStart: now, msBefore: 0, end: null, liters: 0, lastTotal: null, flowSeen: false,
       odo: 0, lastP: null, hist: [], curve: null, turning: false, turns: 0, paused: false, pauses: 0 };
   }
@@ -1455,6 +1480,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     rec.qP.forEach(function (k) { if (k && rec.pGeo[k]) pGeo[k] = rec.pGeo[k]; });
     return { id: rec.id, open: open, paused: rec.paused, pauses: rec.pauses, quads: rec.quads, colors: rec.colors, track: rec.track, trackDraw: rec.trackDraw,
       qA: rec.qA, qL: rec.qL, qR: rec.qR, qP: rec.qP, qI: rec.qI, qT: rec.qT, pGeo: pGeo, pendL: rec.pendL, rawL: true, corrLog: rec.corrLog,
+      gapL: rec.gapL, gaps: rec.gaps,
       origin: rec.origin, sum: rec.sum, turns: rec.turns, liters: rec.liters, flowSeen: rec.flowSeen, msTotal: st.ms, start: rec.start, end: rec.end,
       sensor: flow.device && flow.device.name || null,
       stats: st, cfg: JSON.parse(JSON.stringify(cfg)), date: new Date(rec.start).toISOString() };
@@ -1484,6 +1510,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     for (i = r.qI.length; i < n; i++) { r.qI.push(null); r.qT.push(r.qR[i]); }
     Object.keys(r.pGeo).forEach(function (k) { if (!pcache[k]) pcache[k] = r.pGeo[k]; });
     r.pendL = s.pendL || 0; r.pauses = s.pauses || 0; r.corrLog = s.corrLog || [];
+    r.gapL = s.gapL || 0; r.gaps = s.gaps || [];
     r.origin = s.origin || (r.quads.length ? { lat: r.quads[0][0][0], lon: r.quads[0][0][1] } : null);
     r.turns = s.turns || (s.stats && s.stats.turns) || 0;
     r.flowSeen = !!(s.flowSeen || (s.stats && s.stats.measured !== null && s.stats.measured !== undefined));
@@ -1666,6 +1693,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     statusHoldUntil = 0;
     rec.paused = false; rec.segStart = Date.now();
     rec.lastTotal = flow.total;              // was während der Unterbrechung floss, nicht mitzählen
+    rec.lastFlowAt = Date.now();
     follow = true; keepAwake(); showMsg('');
     if (!autosaveTimer) startRecUI();
     persist(snapshot(true));
@@ -1841,7 +1869,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     });
     // gemessene Gülle ohne Streifen (z. B. nur im Stand gepumpt): «ohne Zuordnung»
     if (measured) {
-      var rest = (d.liters || 0) * f - gotM;
+      var rest = Math.round((d.liters || 0) * f - gotM);     // auf ganze Liter, damit Bericht und Hinweis gleich runden
       if (rest > 50) entry('?').L += rest;
     }
     var parcels = Object.keys(by).map(function (k) {
@@ -1849,10 +1877,18 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       return { key: k, nr: g ? g.nr : 'ohne Zuordnung', ak: g ? g.ak : '', egrid: g ? g.egrid : '', ha: ha, m3: m3, rate: ha > 0.0005 ? m3 / ha : null };
     }).sort(function (a, b) { return (a.key === '?') - (b.key === '?') || b.m3 - a.m3; });
     var ha = owner.size / 10000, m3 = parcels.reduce(function (s, p) { return s + p.m3; }, 0);
-    return { parcels: parcels, ha: ha, m3: m3, rate: ha > 0.0005 ? m3 / ha : null, measured: measured };
+    // Ø-Menge nur aus Gülle mit Ort: «ohne Zuordnung» hat keine Fläche und würde den Schnitt verfälschen
+    var m3Ort = parcels.reduce(function (s, p) { return s + (p.key === '?' && p.ha < 0.0005 ? 0 : p.m3); }, 0);
+    return { parcels: parcels, ha: ha, m3: m3, rate: ha > 0.0005 ? m3Ort / ha : null, measured: measured };
   }
 
   // ---------- Bericht ----------
+  // Gülle ohne GPS-Position (App nicht vorne, Bluetooth kurz weg): im Total, aber ohne Ort – offen ausweisen
+  function gapNote(d) {
+    if (!d.gapL || d.gapL < 50) return '';
+    var n = (d.gaps || []).length;
+    return ' · davon ' + (Math.round(d.gapL * corrOf(d)) / 1000).toFixed(1) + ' m³ ohne Position (' + n + (n === 1 ? ' Lücke' : ' Lücken') + ', unter «ohne Zuordnung»)';
+  }
   // Korrektur während der Aufzeichnung angepasst: im Bericht offenlegen (wichtig für die Abrechnung)
   function corrNote(d) {
     var l = d.corrLog || [];
@@ -1922,7 +1958,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
     var t0 = new Date(d.start || d.date), t1 = d.end ? new Date(d.end) : null;
     var hm = function (t) { return t.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' }); };
     var named = sm.parcels.filter(function (p) { return p.key !== '?'; }).length;
-    var src = sm.measured ? 'gemessen' + (d.sensor ? ' (' + d.sensor + ')' : ' (Durchflussmesser)') + (c.flowCorr || (d.corrLog && d.corrLog.length) ? ', Korrektur ' + (c.flowCorr > 0 ? '+' : '') + (c.flowCorr || 0) + ' %' : '') + corrNote(d)
+    var src = sm.measured ? 'gemessen' + (d.sensor ? ' (' + d.sensor + ')' : ' (Durchflussmesser)') + (c.flowCorr || (d.corrLog && d.corrLog.length) ? ', Korrektur ' + (c.flowCorr > 0 ? '+' : '') + (c.flowCorr || 0) + ' %' : '') + corrNote(d) + gapNote(d)
                           : c.pump ? 'berechnet aus Pumpen-Volumenstrom ' + c.pump + ' m³/h und Tempo (kein Durchflussmesser)'
                                    : 'berechnet aus Fläche × Soll ' + (c.rate || 0) + ' m³/ha (kein Durchflussmesser)';
     $('repHead').innerHTML =
@@ -1940,7 +1976,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
       '</dl>';
     var rows = sm.parcels.map(function (p) {
       var unk = p.key === '?';
-      return '<tr' + (unk ? ' class="unknown"' : '') + '><td>' + (unk ? 'ohne Zuordnung<small>Parzelle nicht ermittelt (kein Netz)</small>' : 'Parzelle <b>' + esc(p.nr) + '</b><small>' + esc([p.ak, p.egrid].filter(Boolean).join(' · ')) + '</small>') + '</td>' +
+      return '<tr' + (unk ? ' class="unknown"' : '') + '><td>' + (unk ? 'ohne Zuordnung<small>ohne GPS-Position (App nicht vorne, Verbindung weg) oder Parzelle nicht ermittelt</small>' : 'Parzelle <b>' + esc(p.nr) + '</b><small>' + esc([p.ak, p.egrid].filter(Boolean).join(' · ')) + '</small>') + '</td>' +
         '<td>' + p.ha.toFixed(2) + '</td><td>' + f1(p.m3) + '</td><td>' + f1(p.rate) + '</td></tr>';
     }).join('');
     $('repTable').innerHTML = '<table class="rep-table"><thead><tr><th>Parzelle</th><th>Fläche ha</th><th>Gülle m³</th><th>m³/ha</th></tr></thead><tbody>' + rows +
@@ -2177,7 +2213,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
         gray(); doc.setFontSize(7.5); doc.text(b[1].toUpperCase(), bx + 3, y + 13.5);
       });
       y += 21;
-      var src = sm.measured ? 'gemessen' + (d.sensor ? ' mit ' + d.sensor : ' (Durchflussmesser)') + (c.flowCorr || (d.corrLog && d.corrLog.length) ? ', Korrektur ' + (c.flowCorr > 0 ? '+' : '') + (c.flowCorr || 0) + ' %' : '') + corrNote(d)
+      var src = sm.measured ? 'gemessen' + (d.sensor ? ' mit ' + d.sensor : ' (Durchflussmesser)') + (c.flowCorr || (d.corrLog && d.corrLog.length) ? ', Korrektur ' + (c.flowCorr > 0 ? '+' : '') + (c.flowCorr || 0) + ' %' : '') + corrNote(d) + gapNote(d)
               : c.pump ? 'berechnet aus Pumpen-Volumenstrom ' + c.pump + ' m³/h und Tempo' : 'berechnet aus Fläche × Soll';
       gray(); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
       doc.splitTextToSize(dash('Gülle: ' + src + ' · Überlappung ' + Math.round(st.overlap || 0) + ' %'), R0 - L0).forEach(function (l, i) {
@@ -2212,7 +2248,7 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;background:var(--yell
         black(); doc.setFont('helvetica', unk ? 'italic' : 'bold'); doc.setFontSize(9.5);
         doc.text(unk ? 'ohne Zuordnung' : 'Parzelle ' + p.nr, cols[0], y + 4.8);
         gray(); doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-        doc.text(unk ? 'kein Netz' : [p.ak, p.egrid].filter(Boolean).join(' · '), cols[1], y + 4.8);
+        doc.text(unk ? 'ohne Position / Parzelle' : [p.ak, p.egrid].filter(Boolean).join(' · '), cols[1], y + 4.8);
         black(); doc.setFontSize(9.5);
         doc.text(p.ha.toFixed(2), 149, y + 4.8, { align: 'right' }); doc.text(f1(p.m3), 172, y + 4.8, { align: 'right' }); doc.text(f1(p.rate), cols[5], y + 4.8, { align: 'right' });
         y += 7;
